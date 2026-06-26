@@ -17,6 +17,8 @@ import gg.refx.android.feature.servers.sections.FilesScreen
 import gg.refx.android.feature.servers.sections.SchedulesScreen
 import gg.refx.android.feature.servers.sections.ServerSettingsScreen
 import gg.refx.android.feature.servers.sections.SubUsersScreen
+import gg.refx.android.feature.servers.sections.SwitchGameScreen
+import gg.refx.android.feature.servers.sections.UpgradeScreen
 
 /**
  * Nested navigation for the Servers tab: list → detail. Keeping the graph inside
@@ -55,6 +57,8 @@ fun ServersTab() {
                         ServerSection.SCHEDULES -> nav.navigate("schedules/$id")
                         ServerSection.SUB_USERS -> nav.navigate("subusers/$id")
                         ServerSection.SETTINGS -> nav.navigate("settings/$id")
+                        ServerSection.SWITCH_GAME -> nav.navigate("switchgame/$id")
+                        ServerSection.UPGRADE -> nav.navigate("upgrade/$id")
                         else -> WebLink.open(context, "${container.config.webOrigin}/servers/$shortId/${section.webPath}")
                     }
                 },
@@ -77,6 +81,12 @@ fun ServersTab() {
         }
         composable("settings/{serverId}") { e ->
             ServerSettingsScreen(serverId = e.arguments?.getString("serverId").orEmpty(), onBack = { nav.popBackStack() })
+        }
+        composable("switchgame/{serverId}") { e ->
+            SwitchGameScreen(serverId = e.arguments?.getString("serverId").orEmpty(), onBack = { nav.popBackStack() })
+        }
+        composable("upgrade/{serverId}") { e ->
+            UpgradeScreen(serverId = e.arguments?.getString("serverId").orEmpty(), onBack = { nav.popBackStack() })
         }
     }
 }

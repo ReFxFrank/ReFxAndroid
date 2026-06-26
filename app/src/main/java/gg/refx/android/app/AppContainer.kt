@@ -22,6 +22,8 @@ import gg.refx.android.data.api.ServerSettingsApi
 import gg.refx.android.data.api.ServersApi
 import gg.refx.android.data.api.SubUsersApi
 import gg.refx.android.data.api.SupportApi
+import gg.refx.android.data.api.SwitchGameApi
+import gg.refx.android.data.api.UpgradeApi
 import gg.refx.android.data.repo.AccountRepository
 import gg.refx.android.data.repo.AuthRepository
 import gg.refx.android.data.repo.BackupsRepository
@@ -33,6 +35,8 @@ import gg.refx.android.data.repo.ServerSettingsRepository
 import gg.refx.android.data.repo.ServersRepository
 import gg.refx.android.data.repo.SubUsersRepository
 import gg.refx.android.data.repo.SupportRepository
+import gg.refx.android.data.repo.SwitchGameRepository
+import gg.refx.android.data.repo.UpgradeRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import retrofit2.Retrofit
@@ -103,6 +107,8 @@ class AppContainer(
     fun subUsersApi(): SubUsersApi = service()
     fun schedulesApi(): SchedulesApi = service()
     fun serverSettingsApi(): ServerSettingsApi = service()
+    fun upgradeApi(): UpgradeApi = service()
+    fun switchGameApi(): SwitchGameApi = service()
 
     val authRepository: AuthRepository by lazy {
         AuthRepository(
@@ -134,6 +140,8 @@ class AppContainer(
     val subUsersRepository: SubUsersRepository by lazy { SubUsersRepository(apiProvider = ::subUsersApi) }
     val schedulesRepository: SchedulesRepository by lazy { SchedulesRepository(apiProvider = ::schedulesApi) }
     val serverSettingsRepository: ServerSettingsRepository by lazy { ServerSettingsRepository(apiProvider = ::serverSettingsApi) }
+    val upgradeRepository: UpgradeRepository by lazy { UpgradeRepository(apiProvider = ::upgradeApi) }
+    val switchGameRepository: SwitchGameRepository by lazy { SwitchGameRepository(apiProvider = ::switchGameApi) }
 
     /** A fresh console socket per server-detail screen; the owner disposes it. */
     fun createConsoleSocket(): ConsoleSocket =

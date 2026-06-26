@@ -45,7 +45,9 @@ enum class ServerSection(
 
     /** Sections with a native screen; the rest deep-link to the web panel. */
     val isNative: Boolean
-        get() = this in setOf(CONSOLE, FILES, BACKUPS, DATABASES, SCHEDULES, SUB_USERS, SETTINGS)
+        get() = this in setOf(
+            CONSOLE, FILES, BACKUPS, DATABASES, SCHEDULES, SUB_USERS, SETTINGS, SWITCH_GAME, UPGRADE,
+        )
 
     fun isApplicable(server: Server): Boolean {
         val slug = server.template?.slug?.lowercase().orEmpty()
