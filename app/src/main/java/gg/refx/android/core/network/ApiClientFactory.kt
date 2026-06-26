@@ -44,7 +44,7 @@ object ApiClientFactory {
         return Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(client)
-            .addConverterFactory(EnvelopeConverterFactory(kotlinxFactory))
+            .addConverterFactory(EnvelopeConverterFactory(RefxJson, kotlinxFactory))
             .build()
     }
 }

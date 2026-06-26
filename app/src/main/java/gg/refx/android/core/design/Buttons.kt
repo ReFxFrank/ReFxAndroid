@@ -61,8 +61,9 @@ fun RefxSecondaryButton(
         enabled = enabled && !loading,
         shape = RefxControlShape,
         colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = DesignTokens.AppSecondary,
-            contentColor = DesignTokens.AppForegroundStrong,
+            // refxSecondary: fill appCard + glassOverlay, fg appForeground (Theme.swift).
+            containerColor = DesignTokens.AppCard,
+            contentColor = DesignTokens.AppForeground,
         ),
     ) {
         ButtonContent(text, loading, DesignTokens.AppForegroundStrong)

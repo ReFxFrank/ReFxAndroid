@@ -20,7 +20,7 @@ val RefxControlShape = RoundedCornerShape(12.dp)
 fun Modifier.cardSurface(shape: androidx.compose.ui.graphics.Shape = RefxCardShape): Modifier =
     this
         .clip(shape)
-        .background(DesignTokens.AppCardTranslucent)
+        .background(DesignTokens.AppPanel)
         .border(1.dp, DesignTokens.AppBorder, shape)
 
 /**
@@ -31,10 +31,11 @@ fun Modifier.screenBackground(): Modifier =
     this
         .fillMaxSize()
         .background(
+            // screenGradient: top #0A111D → bottom #070B12 (Theme.swift).
             Brush.verticalGradient(
                 colors = listOf(
-                    DesignTokens.AppBackgroundElevated,
                     DesignTokens.AppBackground,
+                    DesignTokens.AppBackgroundDeep,
                 ),
             ),
         )

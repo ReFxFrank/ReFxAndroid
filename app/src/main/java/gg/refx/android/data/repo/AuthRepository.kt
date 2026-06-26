@@ -4,65 +4,75 @@ import gg.refx.android.core.network.TokenPair
 import gg.refx.android.core.network.TokenProvider
 import gg.refx.android.core.network.apiCall
 import gg.refx.android.core.session.SessionManager
-import gg.refx.android.data.api.AccountApi
 import gg.refx.android.data.api.AuthApi
 import gg.refx.android.data.model.Account
 import gg.refx.android.data.model.LoginRequest
-import gg.refx.android.data.model.LoginResponse
-import gg.refx.android.data.model.TwoFactorVerifyRequest
+import gg.refx.android.data.model.LogoutRequest
+import gg.refx.android.data.model.MFAMethod
+import gg.refx.android.data.model.MfaVerifyRequest
+import gg.refx.android.data.model.TokenResponse
 
-/** Outcome of a login attempt. */
+/** Outcome of a login / MFA-verify attempt. */
 sealed interface LoginResult {
     data class Success(val account: Account) : LoginResult
-    /** The server requires a TOTP code; carry the challenge token to the verify step. */
-    data class TwoFactorRequired(val twoFactorToken: String?) : LoginResult
+    /** The server requires an MFA code; carry the challenge token + offered methods. */
+    data class MfaRequired(val mfaToken: String, val methods: List<MFAMethod>) : LoginResult
 }
 
 /**
- * Owns sign-in / sign-out and account loading. APIs are supplied via providers so
- * the repository keeps working after a Settings origin change rebuilds Retrofit.
+ * Owns sign-in / MFA / sign-out and current-user loading. The API is supplied via a
+ * provider so the repository keeps working after a Settings origin change rebuilds
+ * Retrofit.
  */
 class AuthRepository(
     private val authApiProvider: () -> AuthApi,
-    private val accountApiProvider: () -> AccountApi,
     private val tokens: TokenProvider,
     private val session: SessionManager,
 ) {
 
     suspend fun login(email: String, password: String): LoginResult = apiCall {
-        val response = authApiProvider().login(LoginRequest(email = email.trim(), password = password))
-        completeLogin(response)
-    }
-
-    suspend fun verifyTotp(code: String, twoFactorToken: String?): LoginResult = apiCall {
-        val response = authApiProvider().verifyTotp(
-            TwoFactorVerifyRequest(totp = code.trim(), twoFactorToken = twoFactorToken),
+        val response = authApiProvider().login(
+            LoginRequest(email = email.trim(), password = password),
         )
-        completeLogin(response)
+        val pair = response.tokens
+        if (pair != null) {
+            persistAndLoad(pair)
+        } else {
+            LoginResult.MfaRequired(
+                mfaToken = response.mfaToken.orEmpty(),
+                methods = response.methods,
+            )
+        }
     }
 
-    private suspend fun completeLogin(response: LoginResponse): LoginResult {
-        val pair = response.tokens
-        if (pair == null) {
-            // No tokens yet → a 2FA step is required.
-            return LoginResult.TwoFactorRequired(response.twoFactorToken)
+    suspend fun verifyMfa(code: String, mfaToken: String, method: MFAMethod = MFAMethod.TOTP): LoginResult =
+        apiCall {
+            val pair = authApiProvider().verifyMfa(
+                MfaVerifyRequest(mfaToken = mfaToken, code = code.trim(), method = method.raw),
+            )
+            persistAndLoad(pair)
         }
+
+    private suspend fun persistAndLoad(pair: TokenResponse): LoginResult {
         tokens.save(TokenPair(pair.accessToken, pair.refreshToken))
-        val account = accountApiProvider().getAccount()
+        val account = authApiProvider().me()
         session.onSignedIn(account)
         return LoginResult.Success(account)
     }
 
-    /** Load (or refresh) the current account; updates the session. */
+    /** Load (or refresh) the current user; updates the session. */
     suspend fun loadAccount(): Account = apiCall {
-        val account = accountApiProvider().getAccount()
+        val account = authApiProvider().me()
         session.updateAccount(account)
         account
     }
 
     /** Explicit sign-out: best-effort server logout, then clear local state. */
     suspend fun logout() {
-        runCatching { authApiProvider().logout() }
+        val refresh = tokens.refreshToken()
+        if (refresh != null) {
+            runCatching { authApiProvider().logout(LogoutRequest(refresh)) }
+        }
         session.signOut()
     }
 }

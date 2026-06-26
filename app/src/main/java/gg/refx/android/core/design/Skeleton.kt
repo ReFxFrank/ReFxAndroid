@@ -43,9 +43,9 @@ fun SkeletonBlock(
 
     val shimmer = Brush.linearGradient(
         colors = listOf(
+            DesignTokens.AppCardElevated,
             DesignTokens.AppCard,
-            DesignTokens.AppSecondary,
-            DesignTokens.AppCard,
+            DesignTokens.AppCardElevated,
         ),
         start = Offset(translate - 300f, 0f),
         end = Offset(translate, 0f),

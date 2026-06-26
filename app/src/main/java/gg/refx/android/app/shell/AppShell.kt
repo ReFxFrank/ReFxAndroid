@@ -31,7 +31,7 @@ import gg.refx.android.feature.support.SupportScreen
  */
 @Composable
 fun AppShell(account: Account?) {
-    val role = account?.role ?: UserRole.USER
+    val role = account?.globalRole ?: UserRole.CUSTOMER
     val tabs = TabDestination.visibleFor(role)
     val navController = rememberNavController()
 
@@ -56,7 +56,7 @@ fun AppShell(account: Account?) {
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = DesignTokens.AppPrimary,
                             selectedTextColor = DesignTokens.AppForegroundStrong,
-                            indicatorColor = DesignTokens.AppSecondary,
+                            indicatorColor = DesignTokens.AppAccent,
                             unselectedIconColor = DesignTokens.AppMuted,
                             unselectedTextColor = DesignTokens.AppMuted,
                         ),

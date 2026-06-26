@@ -1,4 +1,4 @@
 <resources>
-    <!-- Mirror of DesignTokens.AppBackground; keep in sync with Color.kt. -->
-    <color name="app_background">#FF0A0E1A</color>
+    <!-- Mirror of DesignTokens.AppBackground (#0A111D); keep in sync with Color.kt. -->
+    <color name="app_background">#FF0A111D</color>
 </resources>

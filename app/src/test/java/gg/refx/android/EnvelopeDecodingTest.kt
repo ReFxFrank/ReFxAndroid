@@ -15,14 +15,15 @@ import org.junit.Test
 private data class Dummy(val state: ServerState, val name: String)
 
 /**
- * Contract guard for the success/error envelope and pagination shapes (§3.2):
- * `data` decodes to `<T>`, unknown keys are ignored, errors surface a message,
- * and `Page<E>` carries items + hasMore.
+ * Contract guard for the success/error envelope and pagination shapes
+ * (parity spec §3/§5): `data` decodes to `<T>`, unknown keys are ignored, errors
+ * surface a message, and the **wire** `Page` is `{ data:[E], meta:{…} }` with
+ * `hasMore` computed `page < totalPages` (no `hasMore`/`items` on the wire).
  */
 class EnvelopeDecodingTest {
 
     @Test fun success_envelope_unwraps_to_data() {
-        val json = """{"success":true,"data":{"state":"running","name":"alpha"}}"""
+        val json = """{"success":true,"data":{"state":"RUNNING","name":"alpha"}}"""
         val env = RefxJson.decodeFromString(ApiEnvelope.serializer(Dummy.serializer()), json)
         assertTrue(env.success)
         assertEquals("alpha", env.data?.name)
@@ -30,7 +31,7 @@ class EnvelopeDecodingTest {
     }
 
     @Test fun unknown_keys_are_ignored() {
-        val json = """{"success":true,"data":{"state":"running","name":"alpha","newField":42}}"""
+        val json = """{"success":true,"data":{"state":"RUNNING","name":"alpha","newField":42}}"""
         val env = RefxJson.decodeFromString(ApiEnvelope.serializer(Dummy.serializer()), json)
         assertEquals("alpha", env.data?.name)
     }
@@ -44,14 +45,20 @@ class EnvelopeDecodingTest {
         assertEquals("forbidden", env.error?.code)
     }
 
-    @Test fun page_decodes_items_and_hasMore() {
+    @Test fun page_wire_shape_decodes_and_computes_hasMore() {
         val json = """
-            {"items":[{"state":"running","name":"a"},{"state":"stopped","name":"b"}],
-             "meta":{"total":2,"page":1},"hasMore":true}
+            {"data":[{"state":"RUNNING","name":"a"},{"state":"OFFLINE","name":"b"}],
+             "meta":{"page":1,"pageSize":25,"total":40,"totalPages":2}}
         """.trimIndent()
         val page = RefxJson.decodeFromString(Page.serializer(Dummy.serializer()), json)
         assertEquals(2, page.items.size)
-        assertTrue(page.hasMore)
-        assertEquals(2, page.meta?.total)
+        assertEquals(40, page.meta.total)
+        assertTrue(page.hasMore) // page 1 < totalPages 2
+    }
+
+    @Test fun page_last_page_has_no_more() {
+        val json = """{"data":[],"meta":{"page":2,"pageSize":25,"total":40,"totalPages":2}}"""
+        val page = RefxJson.decodeFromString(Page.serializer(Dummy.serializer()), json)
+        assertFalse(page.hasMore)
     }
 }

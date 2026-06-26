@@ -3,46 +3,56 @@ package gg.refx.android.data.model
 import kotlinx.serialization.Serializable
 
 /**
- * Auth request/response DTOs.
+ * Auth request/response DTOs (parity spec §5, `AuthAPI.swift`).
  *
- * NOTE: field names follow the expected auth-endpoint contract (email+password login,
- * bearer + refresh tokens, optional TOTP step). Reconcile against the panel API
- * DTOs once that repo is available — keep the keys verbatim.
+ * Login may return tokens directly OR an MFA challenge `{ mfaToken, methods }`;
+ * the client then calls `POST auth/mfa/verify { mfaToken, code, method }`.
  */
 
 @Serializable
 data class LoginRequest(
     val email: String,
     val password: String,
-    // Present on the second step when a TOTP code is required.
     val totp: String? = null,
+    val rememberMe: Boolean? = null,
 )
 
+/** `{ accessToken, refreshToken }` — the rotated token pair (refresh rotates both). */
 @Serializable
-data class AuthTokens(
+data class TokenResponse(
     val accessToken: String,
     val refreshToken: String,
 )
 
+/**
+ * Union response from `POST auth/login`: either the token pair (success) or an MFA
+ * challenge (`mfaToken` + available `methods`).
+ */
 @Serializable
 data class LoginResponse(
     val accessToken: String? = null,
     val refreshToken: String? = null,
-    // When true, the server requires a TOTP code to complete sign-in (2FA).
-    val twoFactorRequired: Boolean = false,
-    // Optional short-lived token threading the 2FA challenge to the verify call.
-    val twoFactorToken: String? = null,
+    val mfaToken: String? = null,
+    val methods: List<MFAMethod> = emptyList(),
 ) {
-    val tokens: AuthTokens?
+    val tokens: TokenResponse?
         get() = if (accessToken != null && refreshToken != null) {
-            AuthTokens(accessToken, refreshToken)
+            TokenResponse(accessToken, refreshToken)
         } else {
             null
         }
+
+    val mfaRequired: Boolean get() = tokens == null && mfaToken != null
 }
 
 @Serializable
-data class TwoFactorVerifyRequest(
-    val totp: String,
-    val twoFactorToken: String? = null,
+data class MfaVerifyRequest(
+    val mfaToken: String,
+    val code: String,
+    val method: String, // "totp" | "recovery"
+)
+
+@Serializable
+data class LogoutRequest(
+    val refreshToken: String,
 )

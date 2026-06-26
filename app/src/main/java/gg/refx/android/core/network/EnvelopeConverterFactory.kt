@@ -1,21 +1,31 @@
 package gg.refx.android.core.network
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.serializer
 import okhttp3.ResponseBody
 import retrofit2.Converter
 import retrofit2.Retrofit
-import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 
 /**
- * Retrofit converter that transparently unwraps the success envelope so call
- * sites receive `<T>` directly (§3.2). A declared return type `T` is decoded as
- * `ApiEnvelope<T>`; on `success=true` we return `data`, otherwise we throw an
- * [ApiException] built from the error body.
+ * Retrofit converter that mirrors the iOS `APIClient.send` decode path (parity
+ * spec §5):
  *
- * Request-body and string conversion are delegated to [delegate] (the
- * kotlinx-serialization factory) by returning null here.
+ *  - If the body is an object with a boolean `success` field → it's the detail
+ *    envelope `{ success, data }`. On `success=true` return `data` decoded as `T`;
+ *    otherwise throw an [ApiException] built from `error`.
+ *  - Otherwise the body isn't enveloped — e.g. a paginated `{ data:[…], meta:{…} }`
+ *    or a bare object — so decode the whole element directly as `T` (the iOS
+ *    "fallback to raw T" behaviour, which also covers `Page<E>`).
+ *
+ * Request-body and string conversion delegate to [delegate] (the
+ * kotlinx-serialization factory).
  */
 class EnvelopeConverterFactory(
+    private val json: Json,
     private val delegate: Converter.Factory,
 ) : Converter.Factory() {
 
@@ -24,21 +34,32 @@ class EnvelopeConverterFactory(
         annotations: Array<out Annotation>,
         retrofit: Retrofit,
     ): Converter<ResponseBody, *> {
-        val envelopeType: Type = EnvelopeParameterizedType(type)
-        val envelopeConverter = delegate.responseBodyConverter(envelopeType, annotations, retrofit)
-            ?: error("No delegate converter for $envelopeType")
+        val elementSerializer = json.serializersModule.serializer(type)
 
         return Converter<ResponseBody, Any?> { body ->
-            @Suppress("UNCHECKED_CAST")
-            val envelope = envelopeConverter.convert(body) as? ApiEnvelope<Any?>
-                ?: return@Converter null
-            if (envelope.success) {
-                envelope.data
+            val text = body.use { it.string() }
+            if (text.isBlank()) return@Converter null
+
+            val root = json.parseToJsonElement(text)
+            val obj = root as? JsonObject
+            val successField = (obj?.get("success") as? JsonPrimitive)?.booleanOrNull
+
+            if (obj != null && successField != null) {
+                if (successField) {
+                    val data = obj["data"] ?: return@Converter null
+                    json.decodeFromJsonElement(elementSerializer, data)
+                } else {
+                    val error = obj["error"]?.let {
+                        runCatching { json.decodeFromJsonElement(ApiErrorBody.serializer(), it) }.getOrNull()
+                    }
+                    throw ApiException(
+                        message = error?.message ?: ApiException.GENERIC_MESSAGE,
+                        code = error?.code,
+                    )
+                }
             } else {
-                throw ApiException(
-                    message = envelope.error?.message ?: ApiException.GENERIC_MESSAGE,
-                    code = envelope.error?.code,
-                )
+                // Not enveloped (paginated {data,meta} or bare) → decode whole element.
+                json.decodeFromJsonElement(elementSerializer, root)
             }
         }
     }
@@ -57,11 +78,4 @@ class EnvelopeConverterFactory(
         retrofit: Retrofit,
     ): Converter<*, String>? =
         delegate.stringConverter(type, annotations, retrofit)
-
-    /** `ApiEnvelope<elementType>` as a runtime [ParameterizedType]. */
-    private class EnvelopeParameterizedType(private val element: Type) : ParameterizedType {
-        override fun getActualTypeArguments(): Array<Type> = arrayOf(element)
-        override fun getRawType(): Type = ApiEnvelope::class.java
-        override fun getOwnerType(): Type? = null
-    }
 }

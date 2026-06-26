@@ -15,7 +15,7 @@ import java.util.Locale
  */
 @Serializable
 data class Money(
-    val minor: Long,
+    val minorUnits: Long,
     val currency: String,
 ) {
     /** Number of minor-unit fraction digits for [currency] (e.g. 2 for USD, 0 for JPY). */
@@ -26,7 +26,7 @@ data class Money(
 
     /** The major-unit decimal value (e.g. 1299 minor USD → 12.99). */
     val majorValue: Double
-        get() = minor.toDouble() / Math.pow(10.0, fractionDigits.toDouble())
+        get() = minorUnits.toDouble() / Math.pow(10.0, fractionDigits.toDouble())
 
     /** Localized currency string, e.g. "$12.99". Mirrors the iOS `.formatted`. */
     val formatted: String
@@ -42,7 +42,7 @@ data class Money(
         }
 
     companion object {
-        fun of(minor: Long?, currency: String?): Money? =
-            if (minor != null && !currency.isNullOrBlank()) Money(minor, currency) else null
+        fun of(minorUnits: Long?, currency: String?): Money? =
+            if (minorUnits != null && !currency.isNullOrBlank()) Money(minorUnits, currency) else null
     }
 }

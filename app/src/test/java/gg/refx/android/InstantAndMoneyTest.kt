@@ -37,6 +37,15 @@ class InstantAndMoneyTest {
         assertEquals(1000.0, Money(1000, "JPY").majorValue, 0.0001)
     }
 
+    @Test fun money_respects_three_fraction_currency() {
+        // KWD has 3 minor-unit digits: 1000 minor == 1.000 major.
+        assertEquals(1.0, Money(1000, "KWD").majorValue, 0.0001)
+    }
+
+    @Test fun money_normalizes_currency_case() {
+        assertEquals(12.99, Money(1299, "usd").majorValue, 0.0001)
+    }
+
     @Test fun money_of_returns_null_when_incomplete() {
         assertEquals(null, Money.of(null, "USD"))
         assertEquals(null, Money.of(100, null))

@@ -57,9 +57,9 @@ fun AccountScreen(account: Account?) {
                         style = MaterialTheme.typography.bodyLarge,
                         color = DesignTokens.AppForegroundStrong,
                     )
-                    account?.let { RoleBadge(it.role.name) }
+                    account?.let { RoleBadge(it.globalRole.name) }
                 }
-                val credit = account?.creditBalance
+                val credit = account?.creditBalance()
                 if (credit != null) {
                     Text(
                         text = "Store credit: ${credit.formatted}",

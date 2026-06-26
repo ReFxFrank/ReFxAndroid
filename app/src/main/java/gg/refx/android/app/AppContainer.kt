@@ -67,7 +67,6 @@ class AppContainer(
     val authRepository: AuthRepository by lazy {
         AuthRepository(
             authApiProvider = ::authApi,
-            accountApiProvider = ::accountApi,
             tokens = tokenStore,
             session = session,
         )

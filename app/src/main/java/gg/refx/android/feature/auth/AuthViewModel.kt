@@ -3,6 +3,7 @@ package gg.refx.android.feature.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import gg.refx.android.core.network.toApiException
+import gg.refx.android.data.model.MFAMethod
 import gg.refx.android.data.repo.AuthRepository
 import gg.refx.android.data.repo.LoginResult
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,12 +21,13 @@ data class AuthUiState(
     val stage: AuthStage = AuthStage.Login,
     val loading: Boolean = false,
     val error: String? = null,
-    val twoFactorToken: String? = null,
+    val mfaToken: String? = null,
+    val methods: List<MFAMethod> = emptyList(),
 ) {
     val canSubmitLogin: Boolean
         get() = email.isNotBlank() && password.isNotBlank() && !loading
     val canSubmitTotp: Boolean
-        get() = totp.trim().length >= 6 && !loading
+        get() = totp.trim().length >= 6 && !loading && mfaToken != null
 }
 
 class AuthViewModel(private val repo: AuthRepository) : ViewModel() {
@@ -38,7 +40,7 @@ class AuthViewModel(private val repo: AuthRepository) : ViewModel() {
     fun onTotpChange(value: String) = _state.update { it.copy(totp = value.filter(Char::isDigit).take(8), error = null) }
 
     fun backToLogin() = _state.update {
-        it.copy(stage = AuthStage.Login, totp = "", error = null, twoFactorToken = null)
+        it.copy(stage = AuthStage.Login, totp = "", error = null, mfaToken = null, methods = emptyList())
     }
 
     fun login() {
@@ -54,10 +56,11 @@ class AuthViewModel(private val repo: AuthRepository) : ViewModel() {
 
     fun verifyTotp() {
         val current = _state.value
-        if (!current.canSubmitTotp) return
+        val token = current.mfaToken
+        if (!current.canSubmitTotp || token == null) return
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
-            runCatching { repo.verifyTotp(current.totp, current.twoFactorToken) }
+            runCatching { repo.verifyMfa(current.totp, token, MFAMethod.TOTP) }
                 .onSuccess(::handleResult)
                 .onFailure(::handleError)
         }
@@ -69,11 +72,12 @@ class AuthViewModel(private val repo: AuthRepository) : ViewModel() {
                 // SessionManager flips to SignedIn; RootContent swaps to the shell.
                 _state.update { it.copy(loading = false) }
             }
-            is LoginResult.TwoFactorRequired -> _state.update {
+            is LoginResult.MfaRequired -> _state.update {
                 it.copy(
                     loading = false,
                     stage = AuthStage.TwoFactor,
-                    twoFactorToken = result.twoFactorToken,
+                    mfaToken = result.mfaToken,
+                    methods = result.methods,
                 )
             }
         }
