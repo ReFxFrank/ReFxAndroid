@@ -5,12 +5,15 @@ import gg.refx.android.BuildConfig
 import gg.refx.android.core.network.ApiClientFactory
 import gg.refx.android.core.network.ApiConfig
 import gg.refx.android.core.network.TokenRefresher
+import gg.refx.android.core.realtime.ConsoleSocket
 import gg.refx.android.core.session.SessionManager
 import gg.refx.android.core.storage.AppPreferences
 import gg.refx.android.core.storage.SecureTokenStore
 import gg.refx.android.data.api.AccountApi
 import gg.refx.android.data.api.AuthApi
+import gg.refx.android.data.api.ServersApi
 import gg.refx.android.data.repo.AuthRepository
+import gg.refx.android.data.repo.ServersRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import retrofit2.Retrofit
@@ -63,6 +66,7 @@ class AppContainer(
 
     fun authApi(): AuthApi = service()
     fun accountApi(): AccountApi = service()
+    fun serversApi(): ServersApi = service()
 
     val authRepository: AuthRepository by lazy {
         AuthRepository(
@@ -71,4 +75,12 @@ class AppContainer(
             session = session,
         )
     }
+
+    val serversRepository: ServersRepository by lazy {
+        ServersRepository(apiProvider = ::serversApi)
+    }
+
+    /** A fresh console socket per server-detail screen; the owner disposes it. */
+    fun createConsoleSocket(): ConsoleSocket =
+        ConsoleSocket(configProvider = { config }, tokens = tokenStore, refresher = refresher)
 }

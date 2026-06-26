@@ -21,7 +21,7 @@ import gg.refx.android.data.model.Account
 import gg.refx.android.data.model.UserRole
 import gg.refx.android.feature.account.AccountScreen
 import gg.refx.android.feature.home.HomeScreen
-import gg.refx.android.feature.servers.ServersScreen
+import gg.refx.android.feature.servers.ServersTab
 import gg.refx.android.feature.staff.StaffScreen
 import gg.refx.android.feature.support.SupportScreen
 
@@ -71,7 +71,7 @@ fun AppShell(account: Account?) {
             modifier = Modifier.padding(padding),
         ) {
             composable(TabDestination.Home.route) { HomeScreen(account) }
-            composable(TabDestination.Servers.route) { ServersScreen() }
+            composable(TabDestination.Servers.route) { ServersTab() }
             composable(TabDestination.Support.route) { SupportScreen() }
             if (role.isStaff) {
                 composable(TabDestination.Staff.route) { StaffScreen() }
