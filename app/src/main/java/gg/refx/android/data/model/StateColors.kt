@@ -1,0 +1,37 @@
+package gg.refx.android.data.model
+
+import androidx.compose.ui.graphics.Color
+import gg.refx.android.core.design.DesignTokens
+
+/** Maps server/node/billing states to a label + color for StatePill/StatusChip. */
+object StateColors {
+
+    fun server(state: ServerState): Pair<String, Color> = when (state) {
+        ServerState.RUNNING -> "Running" to DesignTokens.AppSuccess
+        ServerState.STARTING -> "Starting" to DesignTokens.AppWarning
+        ServerState.STOPPING -> "Stopping" to DesignTokens.AppWarning
+        ServerState.INSTALLING -> "Installing" to DesignTokens.AppWarning
+        ServerState.STOPPED -> "Stopped" to DesignTokens.AppMuted
+        ServerState.OFFLINE -> "Offline" to DesignTokens.AppMuted
+        ServerState.SUSPENDED -> "Suspended" to DesignTokens.AppDestructive
+        ServerState.ERROR -> "Error" to DesignTokens.AppDestructive
+        ServerState.UNKNOWN -> "Unknown" to DesignTokens.AppMuted
+    }
+
+    fun node(state: NodeState): Pair<String, Color> = when (state) {
+        NodeState.ONLINE -> "Online" to DesignTokens.AppSuccess
+        NodeState.DEGRADED -> "Degraded" to DesignTokens.AppWarning
+        NodeState.MAINTENANCE -> "Maintenance" to DesignTokens.AppWarning
+        NodeState.OFFLINE -> "Offline" to DesignTokens.AppDestructive
+        NodeState.UNKNOWN -> "Unknown" to DesignTokens.AppMuted
+    }
+
+    fun invoice(state: InvoiceState): Pair<String, Color> = when (state) {
+        InvoiceState.PAID -> "Paid" to DesignTokens.AppSuccess
+        InvoiceState.OPEN -> "Open" to DesignTokens.AppWarning
+        InvoiceState.DRAFT -> "Draft" to DesignTokens.AppMuted
+        InvoiceState.VOID -> "Void" to DesignTokens.AppMuted
+        InvoiceState.UNCOLLECTIBLE -> "Uncollectible" to DesignTokens.AppDestructive
+        InvoiceState.UNKNOWN -> "Unknown" to DesignTokens.AppMuted
+    }
+}

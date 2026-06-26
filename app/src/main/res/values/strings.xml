@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">ReFx</string>
+    <string name="default_notification_channel_id">refx_default</string>
+</resources>
