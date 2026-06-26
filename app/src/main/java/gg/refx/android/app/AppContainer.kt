@@ -20,6 +20,7 @@ import gg.refx.android.data.api.FilesApi
 import gg.refx.android.data.api.SchedulesApi
 import gg.refx.android.data.api.ServerSettingsApi
 import gg.refx.android.data.api.ServersApi
+import gg.refx.android.data.api.StaffApi
 import gg.refx.android.data.api.SubUsersApi
 import gg.refx.android.data.api.SupportApi
 import gg.refx.android.data.api.SwitchGameApi
@@ -33,6 +34,7 @@ import gg.refx.android.data.repo.FilesRepository
 import gg.refx.android.data.repo.SchedulesRepository
 import gg.refx.android.data.repo.ServerSettingsRepository
 import gg.refx.android.data.repo.ServersRepository
+import gg.refx.android.data.repo.StaffRepository
 import gg.refx.android.data.repo.SubUsersRepository
 import gg.refx.android.data.repo.SupportRepository
 import gg.refx.android.data.repo.SwitchGameRepository
@@ -109,6 +111,7 @@ class AppContainer(
     fun serverSettingsApi(): ServerSettingsApi = service()
     fun upgradeApi(): UpgradeApi = service()
     fun switchGameApi(): SwitchGameApi = service()
+    fun staffApi(): StaffApi = service()
 
     val authRepository: AuthRepository by lazy {
         AuthRepository(
@@ -142,6 +145,7 @@ class AppContainer(
     val serverSettingsRepository: ServerSettingsRepository by lazy { ServerSettingsRepository(apiProvider = ::serverSettingsApi) }
     val upgradeRepository: UpgradeRepository by lazy { UpgradeRepository(apiProvider = ::upgradeApi) }
     val switchGameRepository: SwitchGameRepository by lazy { SwitchGameRepository(apiProvider = ::switchGameApi) }
+    val staffRepository: StaffRepository by lazy { StaffRepository(apiProvider = ::staffApi) }
 
     /** A fresh console socket per server-detail screen; the owner disposes it. */
     fun createConsoleSocket(): ConsoleSocket =

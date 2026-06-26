@@ -26,7 +26,7 @@ import gg.refx.android.data.model.UserRole
 import gg.refx.android.feature.account.AccountTab
 import gg.refx.android.feature.home.HomeScreen
 import gg.refx.android.feature.servers.ServersTab
-import gg.refx.android.feature.staff.StaffScreen
+import gg.refx.android.feature.staff.StaffTab
 import gg.refx.android.feature.support.SupportTab
 
 /**
@@ -97,7 +97,7 @@ fun AppShell(account: Account?) {
             composable(TabDestination.Servers.route) { ServersTab() }
             composable(TabDestination.Support.route) { SupportTab() }
             if (role.isStaff) {
-                composable(TabDestination.Staff.route) { StaffScreen() }
+                composable(TabDestination.Staff.route) { StaffTab(role) }
             }
             composable(TabDestination.Account.route) { AccountTab(account) }
         }
