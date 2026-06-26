@@ -143,7 +143,8 @@ fun InvoiceDetailScreen(invoiceId: String, onBack: () -> Unit) {
                     Text(state.error!!, color = DesignTokens.AppDestructive, style = MaterialTheme.typography.bodySmall)
                 }
 
-                if (!invoice.isPaid) {
+                // Payment initiation is gated by the purchasing flag (Play §8): hidden on prod.
+                if (!invoice.isPaid && container.purchasingEnabled) {
                     RefxPrimaryButton(
                         text = "Pay on web",
                         onClick = vm::pay,

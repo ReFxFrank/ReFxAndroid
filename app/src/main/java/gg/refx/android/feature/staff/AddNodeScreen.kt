@@ -2,7 +2,6 @@ package gg.refx.android.feature.staff
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -125,7 +126,9 @@ fun AddNodeScreen(onBack: () -> Unit) {
                             "${r.name} (${r.code})",
                             color = if (state.selectedRegionId == r.id) DesignTokens.AppPrimary else DesignTokens.AppForeground,
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.fillMaxWidth().clickable { vm.selectRegion(r.id) }.padding(vertical = 4.dp),
+                            modifier = Modifier.fillMaxWidth()
+                                .selectable(selected = state.selectedRegionId == r.id, role = Role.RadioButton) { vm.selectRegion(r.id) }
+                                .padding(vertical = 14.dp),
                         )
                     }
                 }

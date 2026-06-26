@@ -45,4 +45,18 @@ class ServerSectionTest {
         assertTrue(sections.contains(ServerSection.BACKUPS))
         assertFalse(sections.contains(ServerSection.MINECRAFT))
     }
+
+    @Test fun upgrade_hidden_when_purchasing_disabled() {
+        val s = server("valheim")
+        assertTrue(ServerSection.applicableFor(s, purchasingEnabled = true).contains(ServerSection.UPGRADE))
+        assertFalse(ServerSection.applicableFor(s, purchasingEnabled = false).contains(ServerSection.UPGRADE))
+    }
+
+    @Test fun disabling_purchasing_only_removes_purchase_sections() {
+        val s = server("minecraft-java")
+        val full = ServerSection.applicableFor(s, purchasingEnabled = true)
+        val gated = ServerSection.applicableFor(s, purchasingEnabled = false)
+        // Exactly the purchase sections are dropped; everything else stays.
+        assertTrue(full.filterNot { it.isPurchase } == gated)
+    }
 }

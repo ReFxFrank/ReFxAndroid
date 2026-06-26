@@ -2,7 +2,7 @@ package gg.refx.android.feature.servers.sections
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -101,7 +102,7 @@ fun SwitchGameScreen(serverId: String, onBack: () -> Unit) {
                 state.error?.let { Text(it, color = DesignTokens.AppDestructive, style = MaterialTheme.typography.bodySmall) }
                 Text("Switching reinstalls the server with a new game. This is destructive.", color = DesignTokens.AppMuted, style = MaterialTheme.typography.bodySmall)
                 templates.forEach { template ->
-                    GlassCard(modifier = Modifier.fillMaxWidth().clickable { vm.select(template.id) }) {
+                    GlassCard(modifier = Modifier.fillMaxWidth().selectable(selected = state.selectedId == template.id, role = Role.RadioButton) { vm.select(template.id) }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(template.name, color = if (state.selectedId == template.id) DesignTokens.AppPrimary else DesignTokens.AppForegroundStrong, style = MaterialTheme.typography.titleMedium)

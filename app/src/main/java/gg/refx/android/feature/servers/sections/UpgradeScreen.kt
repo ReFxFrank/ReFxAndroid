@@ -2,7 +2,6 @@ package gg.refx.android.feature.servers.sections
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -186,7 +187,7 @@ fun UpgradeScreen(serverId: String, onBack: () -> Unit) {
 
 @Composable
 private fun TierRow(tier: UpgradeTier, selected: Boolean, isCurrent: Boolean, onSelect: () -> Unit) {
-    GlassCard(modifier = Modifier.fillMaxWidth().clickable(enabled = !isCurrent, onClick = onSelect)) {
+    GlassCard(modifier = Modifier.fillMaxWidth().selectable(selected = selected, enabled = !isCurrent, role = Role.RadioButton, onClick = onSelect)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(tier.name, color = if (selected) DesignTokens.AppPrimary else DesignTokens.AppForegroundStrong, style = MaterialTheme.typography.titleMedium)

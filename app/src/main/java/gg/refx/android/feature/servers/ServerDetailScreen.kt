@@ -369,7 +369,10 @@ private fun ConnectionDot(connection: ConsoleConnectionState) {
 
 @Composable
 private fun SectionsCard(server: Server, onOpen: (ServerSection, String) -> Unit) {
-    val sections = remember(server.id) { ServerSection.applicableFor(server).filter { it != ServerSection.CONSOLE } }
+    val purchasingEnabled = LocalAppContainer.current.purchasingEnabled
+    val sections = remember(server.id, purchasingEnabled) {
+        ServerSection.applicableFor(server, purchasingEnabled).filter { it != ServerSection.CONSOLE }
+    }
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column {
             SectionHeader(title = "Manage")

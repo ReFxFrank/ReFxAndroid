@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -142,11 +143,14 @@ fun BillingScreen(onBack: () -> Unit, onOpenInvoice: (String) -> Unit) {
                             }
                         }
                     }
-                    RefxSecondaryButton(
-                        text = "Add card on web",
-                        onClick = { WebLink.open(context, "${container.config.webOrigin}/billing/payment-methods") },
-                        fullWidth = true,
-                    )
+                    // External payment surface is gated by the purchasing flag (Play §8): hidden on prod.
+                    if (container.purchasingEnabled) {
+                        RefxSecondaryButton(
+                            text = "Add card on web",
+                            onClick = { WebLink.open(context, "${container.config.webOrigin}/billing/payment-methods") },
+                            fullWidth = true,
+                        )
+                    }
                 }
             }
         }
@@ -183,7 +187,7 @@ private fun SubscriptionRow(
 private fun InvoiceRow(invoice: Invoice, onClick: () -> Unit) {
     val (label, color) = StateColors.invoice(invoice.state)
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 4.dp),
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClick = onClick).padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {

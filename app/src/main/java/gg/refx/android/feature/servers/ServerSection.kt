@@ -64,8 +64,12 @@ enum class ServerSection(
         }
     }
 
+    /** Sections that initiate a charge or external payment — hidden when purchasing is off (Play §8). */
+    val isPurchase: Boolean
+        get() = this == UPGRADE
+
     companion object {
-        fun applicableFor(server: Server): List<ServerSection> =
-            entries.filter { it.isApplicable(server) }
+        fun applicableFor(server: Server, purchasingEnabled: Boolean = true): List<ServerSection> =
+            entries.filter { it.isApplicable(server) && (purchasingEnabled || !it.isPurchase) }
     }
 }
