@@ -98,10 +98,11 @@ class BillingViewModel(private val repo: BillingRepository) : ViewModel() {
         viewModelScope.launch {
             runCatching { repo.payInvoice(id) }
                 .onSuccess { result ->
-                    if (result.checkoutUrl != null) {
-                        _state.update { it.copy(pendingCheckoutUrl = result.checkoutUrl) }
-                    } else if (result.paid) {
-                        load()
+                    when {
+                        result.checkoutUrl != null -> _state.update { it.copy(pendingCheckoutUrl = result.checkoutUrl) }
+                        result.paid -> load()
+                        // paid=false with no checkout URL → surface the server reason.
+                        else -> _state.update { it.copy(actionError = result.reason ?: "Payment could not be completed.") }
                     }
                 }
                 .onFailure { t -> _state.update { it.copy(actionError = t.toApiException().message) } }

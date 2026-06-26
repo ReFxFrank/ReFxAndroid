@@ -42,4 +42,14 @@ object StateColors {
         InvoiceState.REFUNDED -> "Refunded" to DesignTokens.AppMuted
         InvoiceState.UNKNOWN -> "Unknown" to DesignTokens.AppMuted
     }
+
+    fun subscription(state: SubscriptionState): Pair<String, Color> = when (state) {
+        SubscriptionState.ACTIVE -> "Active" to DesignTokens.AppSuccess
+        SubscriptionState.TRIALING -> "Trialing" to DesignTokens.AppSuccess
+        SubscriptionState.PAST_DUE -> "Past due" to DesignTokens.AppWarning
+        SubscriptionState.SUSPENDED -> "Suspended" to DesignTokens.AppWarning
+        SubscriptionState.CANCELED -> "Canceled" to DesignTokens.AppMuted
+        SubscriptionState.EXPIRED -> "Expired" to DesignTokens.AppMuted
+        SubscriptionState.UNKNOWN -> "Unknown" to DesignTokens.AppMuted
+    }
 }

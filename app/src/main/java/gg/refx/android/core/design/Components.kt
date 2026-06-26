@@ -118,10 +118,11 @@ fun StatusChip(
             .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
         Text(
-            text = text,
+            text = text.uppercase(),
             color = color,
             fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.7.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -175,7 +176,8 @@ fun ManageRow(
 /** Role badge (e.g. ADMIN, STAFF, OWNER). */
 @Composable
 fun RoleBadge(role: String, modifier: Modifier = Modifier) {
-    StatusChip(text = role.uppercase(), color = DesignTokens.AppPrimary, modifier = modifier)
+    // StatusChip uppercases its label.
+    StatusChip(text = role, color = DesignTokens.AppPrimary, modifier = modifier)
 }
 
 /**
@@ -203,10 +205,11 @@ fun StatePill(
                 .background(color),
         )
         Text(
-            text = label,
+            text = label.uppercase(),
             color = color,
             fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp,
         )
     }
 }

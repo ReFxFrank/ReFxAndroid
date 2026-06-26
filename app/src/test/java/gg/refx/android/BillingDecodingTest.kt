@@ -47,6 +47,20 @@ class BillingDecodingTest {
         assertTrue(sub.renewalAmount.formatted.contains("15.99"))
     }
 
+    @Test fun subscription_renewal_label_uses_compact_suffix() {
+        val json = """{"id":"s","interval":"MONTHLY","state":"ACTIVE","renewalAmountMinor":1599,"currency":"USD"}"""
+        val sub = RefxJson.decodeFromString(SubscriptionListItem.serializer(), json)
+        assertTrue(sub.renewalLabel.contains("15.99"))
+        assertTrue(sub.renewalLabel.endsWith("/mo"))
+    }
+
+    @Test fun subscription_state_color_map() {
+        assertEquals("Active", gg.refx.android.data.model.StateColors.subscription(SubscriptionState.ACTIVE).first)
+        assertEquals(gg.refx.android.core.design.DesignTokens.AppSuccess, gg.refx.android.data.model.StateColors.subscription(SubscriptionState.ACTIVE).second)
+        assertEquals(gg.refx.android.core.design.DesignTokens.AppWarning, gg.refx.android.data.model.StateColors.subscription(SubscriptionState.PAST_DUE).second)
+        assertEquals(gg.refx.android.core.design.DesignTokens.AppMuted, gg.refx.android.data.model.StateColors.subscription(SubscriptionState.CANCELED).second)
+    }
+
     @Test fun credit_transaction_signed_labels() {
         val json = """{"balanceMinor":2500,"currency":"USD","transactions":[
             {"id":"t1","amountMinor":500,"reason":"ADMIN_GRANT"},

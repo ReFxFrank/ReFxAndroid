@@ -91,7 +91,22 @@ data class SubscriptionListItem(
     val renewalAmount: Money get() = Money(renewalAmountMinor, currency)
     val productName: String get() = product?.name ?: "Subscription"
     val canResume: Boolean get() = cancelAtPeriodEnd && state != SubscriptionState.EXPIRED
+
+    /** Compact renewal label, e.g. "$15.99/mo" (mirrors the iOS suffix). */
+    val renewalLabel: String get() = renewalAmount.formatted + interval.shortSuffix
 }
+
+/** Per-interval suffix used for renewal labels (e.g. MONTHLY → "/mo"). */
+val BillingInterval.shortSuffix: String
+    get() = when (this) {
+        BillingInterval.WEEKLY -> "/wk"
+        BillingInterval.BIWEEKLY -> "/2wk"
+        BillingInterval.MONTHLY -> "/mo"
+        BillingInterval.QUARTERLY -> "/qtr"
+        BillingInterval.SEMIANNUAL -> "/6mo"
+        BillingInterval.ANNUAL -> "/yr"
+        BillingInterval.UNKNOWN -> ""
+    }
 
 @Serializable
 data class ProductRef(

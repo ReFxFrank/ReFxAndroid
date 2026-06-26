@@ -7,6 +7,8 @@ import gg.refx.android.data.repo.AccountRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.resume
 
 /**
@@ -24,6 +26,7 @@ class PushTokenRegistrar(
 ) {
     @Volatile private var lastToken: String? = null
     @Volatile private var registeredToken: String? = null
+    private val registerMutex = Mutex()
 
     fun start() {
         scope.launch {
@@ -53,15 +56,21 @@ class PushTokenRegistrar(
     }
 
     private suspend fun register(token: String) {
-        if (registeredToken == token) return
-        runCatching { accountRepoProvider().registerPushToken(token) }
-            .onSuccess { registeredToken = token }
+        // Serialize the check-then-set so a sign-in + token-refresh race can't
+        // double-POST the same token.
+        registerMutex.withLock {
+            if (registeredToken == token) return
+            runCatching { accountRepoProvider().registerPushToken(token) }
+                .onSuccess { registeredToken = token }
+        }
     }
 
     private suspend fun unregister() {
-        val token = registeredToken ?: lastToken ?: return
-        runCatching { accountRepoProvider().unregisterPushToken(token) }
-        registeredToken = null
+        registerMutex.withLock {
+            val token = registeredToken ?: lastToken ?: return
+            runCatching { accountRepoProvider().unregisterPushToken(token) }
+            registeredToken = null
+        }
     }
 
     private suspend fun fetchFcmToken(): String? = runCatching {

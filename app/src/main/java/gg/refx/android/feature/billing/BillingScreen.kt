@@ -160,13 +160,14 @@ private fun SubscriptionRow(
     onCancel: () -> Unit,
     onResume: () -> Unit,
 ) {
+    val (stateLabel, stateColor) = StateColors.subscription(sub.state)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(sub.productName, style = MaterialTheme.typography.titleMedium, color = DesignTokens.AppForegroundStrong, modifier = Modifier.weight(1f))
-            StatusChip(sub.state.name.lowercase().replace('_', ' '), DesignTokens.AppAccentText)
+            StatusChip(stateLabel, stateColor)
         }
         Text(
-            "${sub.renewalAmount.formatted} / ${sub.interval.name.lowercase()}",
+            sub.renewalLabel,
             color = DesignTokens.AppMuted,
             style = MaterialTheme.typography.bodySmall,
         )

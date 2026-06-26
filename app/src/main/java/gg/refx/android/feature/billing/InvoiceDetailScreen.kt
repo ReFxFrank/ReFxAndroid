@@ -75,7 +75,12 @@ class InvoiceDetailViewModel(
         viewModelScope.launch {
             runCatching { repo.payInvoice(invoiceId) }
                 .onSuccess { result ->
-                    _state.update { it.copy(paying = false, checkoutUrl = result.checkoutUrl) }
+                    val failure = if (result.checkoutUrl == null && !result.paid) {
+                        result.reason ?: "Payment could not be completed."
+                    } else {
+                        null
+                    }
+                    _state.update { it.copy(paying = false, checkoutUrl = result.checkoutUrl, error = failure) }
                     if (result.checkoutUrl == null && result.paid) load()
                 }
                 .onFailure { t -> _state.update { it.copy(paying = false, error = t.toApiException().message) } }
