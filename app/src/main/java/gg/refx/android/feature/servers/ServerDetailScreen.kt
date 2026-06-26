@@ -99,7 +99,8 @@ fun ServerDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 ServerHeader(server = server, effectiveState = state.effectiveState)
-                if (state.effectiveState == ServerState.PENDING_PAYMENT) {
+                // External payment entry point gated by the purchasing flag (Play §8): hidden on prod.
+                if (state.effectiveState == ServerState.PENDING_PAYMENT && container.purchasingEnabled) {
                     PayNowBanner(shortId = server.shortId)
                 }
                 GaugesCard(server = server, stats = state.stats)

@@ -170,7 +170,7 @@ private fun AttentionBanner(count: Int) {
     ) {
         GlassCard(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = "$count server${if (count == 1) "" else "s"} need attention",
+                text = "$count server${if (count == 1) " needs" else "s need"} attention",
                 color = DesignTokens.AppWarning,
                 style = MaterialTheme.typography.bodyMedium,
             )

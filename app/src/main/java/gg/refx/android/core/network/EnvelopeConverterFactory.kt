@@ -1,6 +1,7 @@
 package gg.refx.android.core.network
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -46,7 +47,10 @@ class EnvelopeConverterFactory(
 
             if (obj != null && successField != null) {
                 if (successField) {
-                    val data = obj["data"] ?: return@Converter null
+                    // Treat explicit `data: null` the same as an absent key — void/
+                    // no-content success responses must not throw (iOS send parity).
+                    val data = obj["data"]
+                    if (data == null || data is JsonNull) return@Converter null
                     json.decodeFromJsonElement(elementSerializer, data)
                 } else {
                     val error = obj["error"]?.let {

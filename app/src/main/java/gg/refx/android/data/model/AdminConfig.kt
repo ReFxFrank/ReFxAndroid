@@ -25,9 +25,10 @@ data class Coupon(
     val code: String,
     val description: String? = null,
     val kind: CouponKind = CouponKind.UNKNOWN,
-    val value: Int = 0,
+    // Money minor units for FIXED coupons — Long like every other *Minor field (no $21M Int cap).
+    val value: Long = 0,
     val currency: String = "USD",
-    val minSubtotalMinor: Int? = null,
+    val minSubtotalMinor: Long? = null,
     val maxRedemptions: Int? = null,
     val timesRedeemed: Int = 0,
     val maxPerUser: Int? = null,
@@ -40,7 +41,7 @@ data class Coupon(
     val valueLabel: String
         get() = when (kind) {
             CouponKind.PERCENT -> "$value%"
-            CouponKind.FIXED -> Money(value.toLong(), currency).formatted
+            CouponKind.FIXED -> Money(value, currency).formatted
             CouponKind.UNKNOWN -> value.toString()
         }
 }

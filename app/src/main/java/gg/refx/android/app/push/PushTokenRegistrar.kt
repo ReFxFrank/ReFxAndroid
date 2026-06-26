@@ -42,10 +42,15 @@ class PushTokenRegistrar(
 
     /** Called from [ReFxMessagingService.onNewToken]. */
     fun onNewToken(token: String) {
-        lastToken = token
-        registeredToken = null
-        if (session.state.value is SessionState.SignedIn) {
-            scope.launch { register(token) }
+        // Mutate token state and decide-to-register entirely inside the mutex so a
+        // sign-out racing this rotation can't be overtaken by a stale register, and
+        // so `registeredToken` is never nulled outside the lock (unregister reads it).
+        scope.launch {
+            registerMutex.withLock {
+                lastToken = token
+                registeredToken = null
+                if (session.state.value is SessionState.SignedIn) registerLocked(token)
+            }
         }
     }
 
@@ -56,13 +61,17 @@ class PushTokenRegistrar(
     }
 
     private suspend fun register(token: String) {
-        // Serialize the check-then-set so a sign-in + token-refresh race can't
-        // double-POST the same token.
-        registerMutex.withLock {
-            if (registeredToken == token) return
-            runCatching { accountRepoProvider().registerPushToken(token) }
-                .onSuccess { registeredToken = token }
-        }
+        registerMutex.withLock { registerLocked(token) }
+    }
+
+    /** Caller must hold [registerMutex]. */
+    private suspend fun registerLocked(token: String) {
+        // Re-check under the lock: if a sign-out already landed, it wins and we bail
+        // out instead of binding a live token to a signed-out account.
+        if (session.state.value !is SessionState.SignedIn) return
+        if (registeredToken == token) return
+        runCatching { accountRepoProvider().registerPushToken(token) }
+            .onSuccess { registeredToken = token }
     }
 
     private suspend fun unregister() {
