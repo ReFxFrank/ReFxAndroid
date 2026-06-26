@@ -35,6 +35,11 @@ data class ServersListUiState(
  * Servers list (parity spec §8): paginated `GET servers?page&pageSize=25[&q]`,
  * infinite scroll while `page < totalPages`, debounced search, pull-to-refresh,
  * and a 12s periodic refresh while the screen is visible (driven by the screen).
+ *
+ * Concurrency: every reset bumps an [epoch]; in-flight page loads whose epoch is
+ * stale are discarded, and the load-more job is cancelled on reset — so a refresh
+ * and an infinite-scroll append can never interleave. Appends are de-duplicated by
+ * id (the list is rendered with `key = { it.id }`, so duplicates would crash).
  */
 class ServersListViewModel(private val repo: ServersRepository) : ViewModel() {
 
@@ -44,9 +49,11 @@ class ServersListViewModel(private val repo: ServersRepository) : ViewModel() {
     private var page = 1
     private val accumulated = mutableListOf<Server>()
     private var searchJob: Job? = null
+    private var loadMoreJob: Job? = null
+    private var epoch = 0
 
     init {
-        load(reset = true, showLoading = true)
+        reload(showLoading = true)
     }
 
     fun onQueryChange(value: String) {
@@ -54,53 +61,83 @@ class ServersListViewModel(private val repo: ServersRepository) : ViewModel() {
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             delay(SEARCH_DEBOUNCE_MS)
-            load(reset = true, showLoading = true)
+            reload(showLoading = true)
         }
     }
 
+    /** Pull-to-refresh: reload from page 1. */
     fun refresh() {
         _state.update { it.copy(isRefreshing = true) }
-        load(reset = true, showLoading = false)
+        reload(showLoading = false)
     }
 
-    /** Silent periodic refresh (no spinner) — driven by the screen every 12s. */
+    /** Periodic silent poll: re-fetch the currently-loaded pages without a spinner
+     *  and without collapsing infinite-scroll progress. */
     fun silentRefresh() {
-        if (_state.value.isLoadingMore) return
-        load(reset = true, showLoading = false)
+        val s = _state.value
+        if (s.isLoadingMore || s.state.value == null) return
+        val myEpoch = ++epoch
+        loadMoreJob?.cancel()
+        val pages = page.coerceAtLeast(1)
+        viewModelScope.launch {
+            val collected = mutableListOf<Server>()
+            var lastHasMore = false
+            val ok = runCatching {
+                for (p in 1..pages) {
+                    val result = repo.list(p, query = s.query.takeIf { it.isNotBlank() }.orEmpty())
+                    collected += result.items
+                    lastHasMore = result.hasMore
+                }
+            }.isSuccess
+            if (!ok || myEpoch != epoch) return@launch
+            page = pages
+            replaceAll(collected)
+            _state.update { it.copy(state = LoadState.Loaded(accumulated.toList()), hasMore = lastHasMore) }
+        }
     }
 
     fun loadNextPage() {
         val s = _state.value
         if (!s.hasMore || s.isLoadingMore || s.state is LoadState.Loading) return
+        val myEpoch = epoch
         _state.update { it.copy(isLoadingMore = true) }
-        viewModelScope.launch {
+        loadMoreJob = viewModelScope.launch {
             runCatching { repo.list(page + 1, query = s.query) }
                 .onSuccess { result ->
-                    page += 1
-                    accumulated += result.items
-                    _state.update {
-                        it.copy(
-                            state = LoadState.Loaded(accumulated.toList()),
-                            hasMore = result.hasMore,
-                            isLoadingMore = false,
-                        )
+                    if (myEpoch == epoch) {
+                        page += 1
+                        addDistinct(result.items)
+                        _state.update {
+                            it.copy(
+                                state = LoadState.Loaded(accumulated.toList()),
+                                hasMore = result.hasMore,
+                                isLoadingMore = false,
+                            )
+                        }
+                    } else {
+                        _state.update { it.copy(isLoadingMore = false) }
                     }
                 }
                 .onFailure { _state.update { it.copy(isLoadingMore = false) } }
         }
     }
 
-    private fun load(reset: Boolean, showLoading: Boolean) {
-        if (reset) page = 1
+    private fun reload(showLoading: Boolean) {
+        val myEpoch = ++epoch
+        loadMoreJob?.cancel()
+        page = 1
         if (showLoading && _state.value.state.value == null) {
             _state.update { it.copy(state = LoadState.Loading) }
         }
         viewModelScope.launch {
             runCatching { repo.list(1, query = _state.value.query) }
                 .onSuccess { result ->
+                    if (myEpoch != epoch) {
+                        _state.update { it.copy(isRefreshing = false) }
+                        return@onSuccess
+                    }
                     page = 1
-                    accumulated.clear()
-                    accumulated += result.items
+                    replaceAll(result.items)
                     _state.update {
                         it.copy(
                             state = LoadState.Loaded(accumulated.toList()),
@@ -122,6 +159,19 @@ class ServersListViewModel(private val repo: ServersRepository) : ViewModel() {
                         )
                     }
                 }
+        }
+    }
+
+    private fun replaceAll(items: List<Server>) {
+        accumulated.clear()
+        addDistinct(items)
+    }
+
+    /** Append only ids not already present (the list key is the server id). */
+    private fun addDistinct(items: List<Server>) {
+        val seen = accumulated.mapTo(HashSet()) { it.id }
+        for (item in items) {
+            if (seen.add(item.id)) accumulated += item
         }
     }
 

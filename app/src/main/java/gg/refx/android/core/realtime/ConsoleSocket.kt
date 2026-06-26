@@ -68,11 +68,16 @@ class ConsoleSocket(
     private val _stats = MutableStateFlow<StatsFrame?>(null)
     val stats: StateFlow<StatsFrame?> = _stats.asStateFlow()
 
-    private var socket: Socket? = null
-    private var serverId: String? = null
+    private val _appendCount = MutableStateFlow(0L)
+    /** Monotonic counter bumped on every appended line — drives console auto-scroll
+     *  (the [lines] size saturates at [MAX_LINES] and can't be used as a key). */
+    val appendCount: StateFlow<Long> = _appendCount.asStateFlow()
 
-    @Volatile
-    private var didRefreshForAuth = false
+    // Written on the IO scope, read from the caller thread → @Volatile for visibility.
+    @Volatile private var socket: Socket? = null
+    @Volatile private var serverId: String? = null
+    @Volatile private var didRefreshForAuth = false
+    @Volatile private var disposed = false
 
     fun connect(serverId: String) {
         this.serverId = serverId
@@ -80,6 +85,7 @@ class ConsoleSocket(
     }
 
     private fun openSocket(serverId: String) {
+        if (disposed) return
         val token = tokens.accessToken()
         if (token == null) {
             _connectionState.value = ConsoleConnectionState.Failed("Not signed in")
@@ -104,9 +110,12 @@ class ConsoleSocket(
         socket = s
 
         s.on(Socket.EVENT_CONNECT) {
-            didRefreshForAuth = false
-            emitSubscribe(serverId)
-            _connectionState.value = ConsoleConnectionState.Connected
+            // Forbidden is terminal — don't let a transport reconnect flip it back.
+            if (!disposed && _connectionState.value != ConsoleConnectionState.Forbidden) {
+                didRefreshForAuth = false
+                emitSubscribe(serverId)
+                _connectionState.value = ConsoleConnectionState.Connected
+            }
         }
         s.on(Socket.EVENT_DISCONNECT) {
             if (_connectionState.value != ConsoleConnectionState.Forbidden) {
@@ -138,8 +147,8 @@ class ConsoleSocket(
         val obj = args.firstOrNull() as? JSONObject ?: return
         val raw = obj.optString("line")
         val stream = obj.optString("stream", "stdout").ifBlank { "stdout" }
-        val newLines = raw.split("\n").map { ConsoleLine(it, stream) }
-        append(newLines)
+        // One event → one ConsoleLine (matches iOS FIFO accounting against MAX_LINES).
+        append(listOf(ConsoleLine(raw, stream)))
     }
 
     private fun onStats(args: Array<out Any?>) {
@@ -168,6 +177,8 @@ class ConsoleSocket(
             message.contains("forbidden") -> {
                 _connectionState.value = ConsoleConnectionState.Forbidden
                 append(listOf(ConsoleLine("You don't have console access to this server.", "stderr")))
+                // Forbidden is terminal: stop the infinite reconnect so it can't re-fire.
+                teardownSocket()
             }
             else -> append(listOf(ConsoleLine(message.ifBlank { "Console error" }, "stderr")))
         }
@@ -177,8 +188,9 @@ class ConsoleSocket(
         val message = args.firstOrNull()?.toString().orEmpty().lowercase()
         if (message.contains("unauthorized") || message.contains("401")) {
             refreshAndReconnect()
-        } else if (_connectionState.value != ConsoleConnectionState.Connected) {
-            // The manager keeps retrying; reflect the reconnecting state.
+        } else if (_connectionState.value != ConsoleConnectionState.Forbidden) {
+            // The manager keeps retrying; reflect the reconnecting state (but never
+            // downgrade the terminal Forbidden state).
             _connectionState.value = ConsoleConnectionState.Reconnecting
         }
     }
@@ -194,6 +206,9 @@ class ConsoleSocket(
         scope.launch {
             val refreshToken = tokens.refreshToken()
             val refreshed = refreshToken?.let { refresher.refresh(it) }
+            // dispose() may have run while the blocking refresh was in flight
+            // (scope.cancel() can't interrupt it) — never resurrect the socket.
+            if (disposed) return@launch
             if (refreshed == null) {
                 _connectionState.value = ConsoleConnectionState.Failed("Session expired")
                 return@launch
@@ -205,10 +220,12 @@ class ConsoleSocket(
     }
 
     private fun append(newLines: List<ConsoleLine>) {
+        if (newLines.isEmpty()) return
         _lines.update { old ->
             val combined = old + newLines
             if (combined.size > MAX_LINES) combined.takeLast(MAX_LINES) else combined
         }
+        _appendCount.update { it + newLines.size }
     }
 
     private fun teardownSocket() {
@@ -227,6 +244,7 @@ class ConsoleSocket(
 
     /** Release everything; call from the owner's onCleared. */
     fun dispose() {
+        disposed = true
         teardownSocket()
         scope.cancel()
     }

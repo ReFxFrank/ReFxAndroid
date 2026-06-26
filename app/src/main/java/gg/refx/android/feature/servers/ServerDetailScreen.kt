@@ -81,6 +81,7 @@ fun ServerDetailScreen(serverId: String, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val lines by vm.console.lines.collectAsStateWithLifecycle()
     val connection by vm.console.connectionState.collectAsStateWithLifecycle()
+    val appendCount by vm.console.appendCount.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize()) {
         DetailTopBar(title = state.server.value?.name ?: "Server", onBack = onBack)
@@ -94,14 +95,26 @@ fun ServerDetailScreen(serverId: String, onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 ServerHeader(server = server, effectiveState = state.effectiveState)
+                if (state.effectiveState == ServerState.PENDING_PAYMENT) {
+                    PayNowBanner(shortId = server.shortId)
+                }
                 GaugesCard(server = server, stats = state.stats)
                 PowerControls(
                     busy = state.powerBusy,
                     onSignal = vm::requestPower,
                 )
+                state.errorMessage?.let { msg ->
+                    Text(
+                        text = msg,
+                        color = DesignTokens.AppDestructive,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.fillMaxWidth().clickable { vm.dismissError() },
+                    )
+                }
                 ConsoleCard(
                     connection = connection,
                     lines = lines,
+                    scrollKey = appendCount,
                     onSend = vm::sendCommand,
                 )
                 SectionsCard(server = server)
@@ -249,14 +262,43 @@ private fun PowerButton(
 }
 
 @Composable
+private fun PayNowBanner(shortId: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val webOrigin = LocalAppContainer.current.config.webOrigin
+    GlassCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { gg.refx.android.core.ui.WebLink.open(context, "$webOrigin/servers/$shortId/billing") },
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = "Payment required",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = DesignTokens.AppWarning,
+                )
+                Text(
+                    text = "This server is awaiting payment. Tap to pay on the web.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DesignTokens.AppMuted,
+                )
+            }
+            Text("Pay now", color = DesignTokens.AppAccentText, style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+@Composable
 private fun ConsoleCard(
     connection: ConsoleConnectionState,
     lines: List<ConsoleLine>,
+    scrollKey: Long,
     onSend: (String) -> Unit,
 ) {
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
-    LaunchedEffect(lines.size) {
+    // Key on the append counter, not lines.size (which saturates at MAX_LINES).
+    LaunchedEffect(scrollKey) {
         if (lines.isNotEmpty()) listState.animateScrollToItem(lines.lastIndex)
     }
 
@@ -313,8 +355,9 @@ private fun ConnectionDot(connection: ConsoleConnectionState) {
         ConsoleConnectionState.Connected -> "Connected" to DesignTokens.AppSuccess
         ConsoleConnectionState.Connecting -> "Connecting" to DesignTokens.AppWarning
         ConsoleConnectionState.Reconnecting -> "Reconnecting" to DesignTokens.AppWarning
-        ConsoleConnectionState.Forbidden -> "No access" to DesignTokens.AppDestructive
-        is ConsoleConnectionState.Failed -> "Disconnected" to DesignTokens.AppDestructive
+        // Spec §2 console state→token map: every non-connected/connecting state → appMuted.
+        ConsoleConnectionState.Forbidden -> "No access" to DesignTokens.AppMuted
+        is ConsoleConnectionState.Failed -> "Disconnected" to DesignTokens.AppMuted
         ConsoleConnectionState.Idle -> "Idle" to DesignTokens.AppMuted
     }
     StatePill(label = label, color = color)

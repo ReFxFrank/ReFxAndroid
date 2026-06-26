@@ -32,7 +32,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -61,11 +64,16 @@ fun ServersListScreen(onOpenServer: (String) -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
-    // Periodic refresh while visible (parity spec §8: 12s poll).
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(POLL_INTERVAL_MS)
-            vm.silentRefresh()
+    // Periodic refresh while visible (parity spec §8: 12s poll). repeatOnLifecycle
+    // pauses the loop when the app drops below STARTED (backgrounded) and resumes it
+    // on return — "while visible", not merely "while composed".
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                delay(POLL_INTERVAL_MS)
+                vm.silentRefresh()
+            }
         }
     }
 
