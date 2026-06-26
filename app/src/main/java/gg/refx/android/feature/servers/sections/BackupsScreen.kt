@@ -64,11 +64,24 @@ class BackupsViewModel(private val serverId: String, private val repo: BackupsRe
     fun load() {
         if (_state.value.backups.value == null) _state.update { it.copy(backups = LoadState.Loading) }
         viewModelScope.launch {
-            runCatching { repo.list(serverId, 1) }
-                .onSuccess { r -> _state.update { it.copy(backups = LoadState.Loaded(r.items)) } }
+            runCatching {
+                // Fetch all pages (capped) so older backups aren't hidden.
+                val all = mutableListOf<gg.refx.android.data.model.Backup>()
+                var page = 1
+                while (page <= MAX_PAGES) {
+                    val r = repo.list(serverId, page)
+                    all += r.items
+                    if (!r.hasMore) break
+                    page++
+                }
+                all.toList()
+            }
+                .onSuccess { list -> _state.update { it.copy(backups = LoadState.Loaded(list)) } }
                 .onFailure { t -> _state.update { if (it.backups.value == null) it.copy(backups = LoadState.Failed(t.toApiException().message)) else it } }
         }
     }
+
+    fun setError(message: String) = _state.update { it.copy(error = message) }
 
     fun create(name: String) {
         _state.update { it.copy(creating = true, error = null) }
@@ -100,6 +113,10 @@ class BackupsViewModel(private val serverId: String, private val repo: BackupsRe
     }
 
     fun downloadOpened() = _state.update { it.copy(downloadUrl = null) }
+
+    private companion object {
+        const val MAX_PAGES = 40
+    }
 }
 
 @Composable
@@ -115,7 +132,12 @@ fun BackupsScreen(serverId: String, onBack: () -> Unit) {
     var confirmRestore by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(state.downloadUrl) { state.downloadUrl?.let { WebLink.open(context, it); vm.downloadOpened() } }
+    LaunchedEffect(state.downloadUrl) {
+        state.downloadUrl?.let { url ->
+            if (!WebLink.open(context, url)) vm.setError("Couldn't open the download link.")
+            vm.downloadOpened()
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         DetailTopBar(title = "Backups", onBack = onBack, trailing = { TextButton(onClick = { showCreate = true }) { Text("Create") } })
@@ -169,10 +191,13 @@ private fun BackupRow(backup: Backup, busy: Boolean, onRestore: () -> Unit, onDe
                 }
                 StatusChip(label, color)
             }
-            if (backup.state == BackupState.COMPLETED) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (backup.state == BackupState.COMPLETED) {
                     TextButton(onClick = onRestore, enabled = !busy) { Text("Restore") }
                     TextButton(onClick = onDownload, enabled = !busy) { Text("Download") }
+                }
+                // Delete is valid for any backup (e.g. cleaning up FAILED ones).
+                if (!backup.isLocked) {
                     TextButton(onClick = onDelete, enabled = !busy) { Text("Delete", color = DesignTokens.AppDestructive) }
                 }
             }

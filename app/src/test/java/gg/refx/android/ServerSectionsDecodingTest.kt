@@ -36,6 +36,9 @@ class ServerSectionsDecodingTest {
     @Test fun permission_catalog_is_complete_and_labeled() {
         assertTrue(ServerPermissionCatalog.all.contains("control.start"))
         assertTrue(ServerPermissionCatalog.all.contains("settings.update"))
+        // Editor-only superset (§4) must be present for the grant editor.
+        assertTrue(ServerPermissionCatalog.all.contains("database.create"))
+        assertTrue(ServerPermissionCatalog.all.contains("user.delete"))
         assertEquals("Start", ServerPermissionCatalog.label("control.start"))
     }
 

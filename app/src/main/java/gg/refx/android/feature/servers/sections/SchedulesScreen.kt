@@ -38,6 +38,8 @@ import gg.refx.android.core.ui.DetailTopBar
 import gg.refx.android.core.ui.LoadState
 import gg.refx.android.data.model.CreateScheduleRequest
 import gg.refx.android.data.model.Schedule
+import gg.refx.android.data.model.ScheduleAction
+import gg.refx.android.data.model.ScheduleTaskRequest
 import gg.refx.android.data.repo.SchedulesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,6 +50,7 @@ import kotlinx.coroutines.launch
 data class SchedulesUiState(
     val schedules: LoadState<List<Schedule>> = LoadState.Loading,
     val busyId: String? = null,
+    val creating: Boolean = false,
     val error: String? = null,
 )
 
@@ -70,11 +73,24 @@ class SchedulesViewModel(private val serverId: String, private val repo: Schedul
     fun run(id: String) = mutate(id) { repo.run(serverId, id) }
     fun delete(id: String) = mutate(id) { repo.delete(serverId, id) }
 
-    fun create(name: String, cron: String) {
+    fun create(name: String, cron: String, onlyWhenOnline: Boolean, action: ScheduleAction, payload: String) {
+        if (_state.value.creating) return
+        _state.update { it.copy(creating = true, error = null) }
         viewModelScope.launch {
-            runCatching { repo.create(serverId, CreateScheduleRequest(name = name.trim(), cron = cron.trim())) }
-                .onSuccess { load() }
-                .onFailure { t -> _state.update { it.copy(error = t.toApiException().message) } }
+            runCatching {
+                repo.create(
+                    serverId,
+                    CreateScheduleRequest(
+                        name = name.trim(),
+                        cron = cron.trim(),
+                        onlyWhenOnline = onlyWhenOnline,
+                        // A schedule needs at least one task to do anything (§5).
+                        tasks = listOf(ScheduleTaskRequest(action = action.raw, payload = payload.trim().ifBlank { null })),
+                    ),
+                )
+            }
+                .onSuccess { _state.update { it.copy(creating = false) }; load() }
+                .onFailure { t -> _state.update { it.copy(creating = false, error = t.toApiException().message) } }
         }
     }
 
@@ -98,6 +114,9 @@ fun SchedulesScreen(serverId: String, onBack: () -> Unit) {
     var showCreate by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     var cron by remember { mutableStateOf("0 * * * *") }
+    var onlyWhenOnline by remember { mutableStateOf(false) }
+    var action by remember { mutableStateOf(ScheduleAction.COMMAND) }
+    var payload by remember { mutableStateOf("") }
     var confirmDelete by remember { mutableStateOf<String?>(null) }
 
     Column(Modifier.fillMaxSize()) {
@@ -128,16 +147,45 @@ fun SchedulesScreen(serverId: String, onBack: () -> Unit) {
     }
 
     if (showCreate) {
+        val payloadLabel = when (action) {
+            ScheduleAction.COMMAND -> "Command"
+            ScheduleAction.POWER -> "Power signal (start/stop/restart/kill)"
+            ScheduleAction.BACKUP -> "Backup name (optional)"
+            ScheduleAction.UNKNOWN -> "Payload"
+        }
+        val payloadRequired = action == ScheduleAction.COMMAND || action == ScheduleAction.POWER
+        val canCreate = name.isNotBlank() && cron.isNotBlank() && (!payloadRequired || payload.isNotBlank())
         AlertDialog(
             onDismissRequest = { showCreate = false },
             title = { Text("New schedule") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
                     OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
                     OutlinedTextField(cron, { cron = it }, label = { Text("Cron expression") }, singleLine = true)
+                    Text("Task", color = DesignTokens.AppMuted, style = MaterialTheme.typography.labelLarge)
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        listOf(ScheduleAction.COMMAND, ScheduleAction.POWER, ScheduleAction.BACKUP).forEach { a ->
+                            TextButton(onClick = { action = a }) {
+                                Text(a.name.lowercase().replaceFirstChar { it.uppercase() }, color = if (action == a) DesignTokens.AppPrimary else DesignTokens.AppMuted)
+                            }
+                        }
+                    }
+                    OutlinedTextField(payload, { payload = it }, label = { Text(payloadLabel) }, singleLine = true)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Switch(checked = onlyWhenOnline, onCheckedChange = { onlyWhenOnline = it })
+                        Text("Only when the server is online", color = DesignTokens.AppForeground, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             },
-            confirmButton = { TextButton(onClick = { if (name.isNotBlank() && cron.isNotBlank()) { vm.create(name, cron); name = ""; showCreate = false } }) { Text("Create") } },
+            confirmButton = {
+                TextButton(
+                    enabled = canCreate && !state.creating,
+                    onClick = {
+                        vm.create(name, cron, onlyWhenOnline, action, payload)
+                        name = ""; payload = ""; showCreate = false
+                    },
+                ) { Text("Create") }
+            },
             dismissButton = { TextButton(onClick = { showCreate = false }) { Text("Cancel") } },
         )
     }

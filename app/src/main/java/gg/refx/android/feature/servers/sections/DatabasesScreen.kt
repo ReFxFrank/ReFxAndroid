@@ -167,7 +167,12 @@ fun DatabasesScreen(serverId: String, onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = vm::dismissPassword,
             title = { Text("New password") },
-            text = { Text(pw, fontFamily = FontFamily.Monospace, color = DesignTokens.AppForegroundStrong) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Copy this now — it can't be retrieved later.", color = DesignTokens.AppWarning, style = MaterialTheme.typography.bodySmall)
+                    Text(pw, fontFamily = FontFamily.Monospace, color = DesignTokens.AppForegroundStrong)
+                }
+            },
             confirmButton = { TextButton(onClick = { clipboard.setText(AnnotatedString(pw)); vm.dismissPassword() }) { Text("Copy & close") } },
         )
     }

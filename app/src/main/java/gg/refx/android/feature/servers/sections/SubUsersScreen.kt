@@ -1,5 +1,6 @@
 package gg.refx.android.feature.servers.sections
 
+import androidx.activity.compose.BackHandler
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.compose.foundation.layout.Arrangement
@@ -112,6 +113,9 @@ fun SubUsersScreen(serverId: String, onBack: () -> Unit) {
     )
     val state by vm.state.collectAsStateWithLifecycle()
     var confirmDelete by remember { mutableStateOf<String?>(null) }
+
+    // System back closes the inline editor instead of popping the whole section.
+    BackHandler(enabled = state.editing != null) { vm.cancelEdit() }
 
     state.editing?.let { edit ->
         SubUserEditor(edit = edit, error = state.error, onEmailChange = vm::onEmailChange, onToggle = vm::togglePermission, onSave = vm::save, onCancel = vm::cancelEdit)

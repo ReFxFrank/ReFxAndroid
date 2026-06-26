@@ -73,6 +73,7 @@ class SwitchGameViewModel(private val serverId: String, private val repo: Switch
 
     fun switch() {
         val id = _state.value.selectedId ?: return
+        if (_state.value.switching) return
         _state.update { it.copy(switching = true, error = null) }
         viewModelScope.launch {
             runCatching { repo.switch(serverId, id, _state.value.keepData) }

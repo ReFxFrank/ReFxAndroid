@@ -47,6 +47,9 @@ object ServerPermissionCatalog {
         Group("Sub-users", listOf("subuser.read")),
         Group("Startup", listOf("startup.update")),
         Group("Settings", listOf("settings.read", "settings.update")),
+        // Editor-only superset (PermissionCatalog.swift) — §4.
+        Group("Databases", listOf("database.read", "database.create", "database.delete")),
+        Group("Users", listOf("user.read", "user.create", "user.update", "user.delete")),
     )
 
     val all: List<String> get() = groups.flatMap { it.permissions }

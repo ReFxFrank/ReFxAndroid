@@ -75,6 +75,7 @@ class ServerSettingsViewModel(private val serverId: String, private val repo: Se
     }
 
     fun reinstall() {
+        if (_state.value.reinstalling) return
         _state.update { it.copy(reinstalling = true, error = null) }
         viewModelScope.launch {
             runCatching { repo.reinstall(serverId) }

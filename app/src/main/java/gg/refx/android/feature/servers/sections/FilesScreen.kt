@@ -1,5 +1,6 @@
 package gg.refx.android.feature.servers.sections
 
+import androidx.activity.compose.BackHandler
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.compose.foundation.clickable
@@ -47,6 +48,7 @@ import gg.refx.android.core.ui.LoadState
 import gg.refx.android.core.ui.WebLink
 import gg.refx.android.data.model.FileEntry
 import gg.refx.android.data.repo.FilesRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -68,17 +70,22 @@ class FilesViewModel(private val serverId: String, private val repo: FilesReposi
     private val _state = MutableStateFlow(FilesUiState())
     val state: StateFlow<FilesUiState> = _state.asStateFlow()
 
+    private var loadJob: Job? = null
+
     init { load("/") }
 
     fun load(path: String) {
+        // Single-flight: cancel any in-flight load and guard the write to the
+        // still-current path, so out-of-order responses can't show the wrong folder.
+        loadJob?.cancel()
         _state.update { it.copy(path = path, entries = LoadState.Loading, error = null) }
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             runCatching { repo.list(serverId, path) }
                 .onSuccess { entries ->
                     val sorted = entries.sortedWith(compareByDescending<FileEntry> { it.isDir }.thenBy { it.name.lowercase() })
-                    _state.update { it.copy(entries = LoadState.Loaded(sorted)) }
+                    _state.update { if (it.path == path) it.copy(entries = LoadState.Loaded(sorted)) else it }
                 }
-                .onFailure { t -> _state.update { it.copy(entries = LoadState.Failed(t.toApiException().message)) } }
+                .onFailure { t -> _state.update { if (it.path == path) it.copy(entries = LoadState.Failed(t.toApiException().message)) else it } }
         }
     }
 
@@ -114,12 +121,25 @@ class FilesViewModel(private val serverId: String, private val repo: FilesReposi
         }
     }
 
-    fun closeEditor() = _state.update { it.copy(editing = null) }
+    // Clear the shared error so an editor save failure can't bleed into the list.
+    fun closeEditor() = _state.update { it.copy(editing = null, error = null) }
+
+    fun setError(message: String) = _state.update { it.copy(error = message) }
 
     fun mkdir(name: String) {
         val path = joinPath(_state.value.path, name)
         viewModelScope.launch {
             runCatching { repo.mkdir(serverId, path) }
+                .onSuccess { load(_state.value.path) }
+                .onFailure { t -> _state.update { it.copy(error = t.toApiException().message) } }
+        }
+    }
+
+    fun rename(entry: FileEntry, newName: String) {
+        if (newName.isBlank()) return
+        val dest = joinPath(_state.value.path, newName)
+        viewModelScope.launch {
+            runCatching { repo.rename(serverId, entry.path, dest) }
                 .onSuccess { load(_state.value.path) }
                 .onFailure { t -> _state.update { it.copy(error = t.toApiException().message) } }
         }
@@ -157,9 +177,21 @@ fun FilesScreen(serverId: String, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     var showMkdir by remember { mutableStateOf(false) }
     var newDir by remember { mutableStateOf("") }
+    var actionEntry by remember { mutableStateOf<FileEntry?>(null) }
     var confirmDelete by remember { mutableStateOf<FileEntry?>(null) }
+    var renameEntry by remember { mutableStateOf<FileEntry?>(null) }
+    var renameText by remember { mutableStateOf("") }
+    val notRoot = state.path.trimEnd('/').isNotEmpty()
 
-    LaunchedEffect(state.downloadUrl) { state.downloadUrl?.let { WebLink.open(context, it); vm.downloadOpened() } }
+    LaunchedEffect(state.downloadUrl) {
+        state.downloadUrl?.let { url ->
+            if (!WebLink.open(context, url)) vm.setError("Couldn't open the download link.")
+            vm.downloadOpened()
+        }
+    }
+
+    // System back closes the inline editor instead of popping the whole section.
+    BackHandler(enabled = state.editing != null) { vm.closeEditor() }
 
     // Editor takes over the screen when a file is open.
     state.editing?.let { edit ->
@@ -176,7 +208,16 @@ fun FilesScreen(serverId: String, onBack: () -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        DetailTopBar(title = "Files", onBack = onBack, trailing = { TextButton(onClick = { showMkdir = true }) { Text("New folder") } })
+        DetailTopBar(
+            title = "Files",
+            onBack = onBack,
+            trailing = {
+                Row {
+                    if (notRoot) TextButton(onClick = vm::goUp) { Text("Up") }
+                    TextButton(onClick = { showMkdir = true }) { Text("New folder") }
+                }
+            },
+        )
         Text(
             text = state.path,
             color = DesignTokens.AppMuted,
@@ -188,9 +229,15 @@ fun FilesScreen(serverId: String, onBack: () -> Unit) {
         )
         state.error?.let { Text(it, color = DesignTokens.AppDestructive, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp)) }
 
-        AsyncState(state = state.entries, isEmpty = { false }, onRetry = { vm.load(state.path) }) { entries ->
+        AsyncState(
+            state = state.entries,
+            isEmpty = { it.isEmpty() },
+            emptyTitle = "Empty folder",
+            emptyMessage = "No files here yet.",
+            onRetry = { vm.load(state.path) },
+        ) { entries ->
             LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
-                if (state.path.trimEnd('/').isNotEmpty()) {
+                if (notRoot) {
                     item {
                         FileRow(name = "..", isDir = true, sub = "Up a level", onClick = vm::goUp, onLong = {})
                     }
@@ -201,12 +248,38 @@ fun FilesScreen(serverId: String, onBack: () -> Unit) {
                         isDir = entry.isDir,
                         sub = if (entry.isDir) "Folder" else "${entry.size} B",
                         onClick = { vm.open(entry) },
-                        onLong = { confirmDelete = entry },
+                        onLong = { actionEntry = entry },
                         onDownload = if (!entry.isDir) ({ vm.download(entry) }) else null,
                     )
                 }
             }
         }
+    }
+
+    // Long-press action chooser: Rename / Delete.
+    actionEntry?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { actionEntry = null },
+            title = { Text(entry.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            text = {
+                Column {
+                    TextButton(onClick = { renameEntry = entry; renameText = entry.name; actionEntry = null }) { Text("Rename") }
+                    TextButton(onClick = { confirmDelete = entry; actionEntry = null }) { Text("Delete", color = DesignTokens.AppDestructive) }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { actionEntry = null }) { Text("Cancel") } },
+        )
+    }
+
+    renameEntry?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { renameEntry = null },
+            title = { Text("Rename") },
+            text = { OutlinedTextField(renameText, { renameText = it }, label = { Text("New name") }, singleLine = true) },
+            confirmButton = { TextButton(onClick = { vm.rename(entry, renameText); renameEntry = null }) { Text("Rename") } },
+            dismissButton = { TextButton(onClick = { renameEntry = null }) { Text("Cancel") } },
+        )
     }
 
     if (showMkdir) {

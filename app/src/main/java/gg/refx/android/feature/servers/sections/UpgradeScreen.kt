@@ -37,6 +37,7 @@ import gg.refx.android.data.model.UpgradeOptions
 import gg.refx.android.data.model.UpgradePreview
 import gg.refx.android.data.model.UpgradeTier
 import gg.refx.android.data.repo.UpgradeRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,6 +58,8 @@ class UpgradeViewModel(private val serverId: String, private val repo: UpgradeRe
     private val _state = MutableStateFlow(UpgradeUiState())
     val state: StateFlow<UpgradeUiState> = _state.asStateFlow()
 
+    private var previewJob: Job? = null
+
     init { load() }
 
     fun load() {
@@ -69,20 +72,33 @@ class UpgradeViewModel(private val serverId: String, private val repo: UpgradeRe
     }
 
     fun selectTier(tierId: String) {
+        previewJob?.cancel()
         _state.update { it.copy(selectedTierId = tierId, preview = null, previewing = true, error = null) }
-        viewModelScope.launch {
+        previewJob = viewModelScope.launch {
             runCatching { repo.preview(serverId, tierId) }
-                .onSuccess { p -> _state.update { it.copy(previewing = false, preview = p) } }
-                .onFailure { t -> _state.update { it.copy(previewing = false, error = t.toApiException().message) } }
+                // Ignore stale previews for a tier the user has since changed away from.
+                .onSuccess { p -> _state.update { if (it.selectedTierId == tierId) it.copy(previewing = false, preview = p) else it } }
+                .onFailure { t -> _state.update { if (it.selectedTierId == tierId) it.copy(previewing = false, error = t.toApiException().message) else it } }
         }
     }
 
     fun apply() {
         val tierId = _state.value.selectedTierId ?: return
+        if (_state.value.applying) return
         _state.update { it.copy(applying = true, error = null) }
         viewModelScope.launch {
             runCatching { repo.apply(serverId, tierId) }
                 .onSuccess { r -> _state.update { it.copy(applying = false, result = r) } }
+                .onFailure { t -> _state.update { it.copy(applying = false, error = t.toApiException().message) } }
+        }
+    }
+
+    fun cancelScheduled() {
+        if (_state.value.applying) return
+        _state.update { it.copy(applying = true, error = null, result = null) }
+        viewModelScope.launch {
+            runCatching { repo.cancelScheduled(serverId) }
+                .onSuccess { _state.update { it.copy(applying = false) }; load() }
                 .onFailure { t -> _state.update { it.copy(applying = false, error = t.toApiException().message) } }
         }
     }
@@ -157,6 +173,13 @@ fun UpgradeScreen(serverId: String, onBack: () -> Unit) {
                 }
             },
             confirmButton = { androidx.compose.material3.TextButton(onClick = { vm.dismissResult(); onBack() }) { Text("Done") } },
+            dismissButton = {
+                if (result.status == PlanChangeStatus.SCHEDULED) {
+                    androidx.compose.material3.TextButton(onClick = vm::cancelScheduled) {
+                        Text("Cancel scheduled change", color = DesignTokens.AppDestructive)
+                    }
+                }
+            },
         )
     }
 }
