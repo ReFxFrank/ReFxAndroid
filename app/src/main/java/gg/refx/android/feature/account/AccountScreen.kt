@@ -7,8 +7,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
+import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Devices
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PrivacyTip
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,12 +36,19 @@ import gg.refx.android.data.model.Account
 import kotlinx.coroutines.launch
 
 /**
- * Account tab (§5): profile header, store-credit display, About & legal link-outs,
- * app-version row and Sign out. Security/Sessions/Notifications screens are wired
- * in Milestone 3; their entry rows are present here.
+ * Account root (§5): profile header, store-credit display, navigation into Billing
+ * and Security/Sessions/Password/Notifications, About & legal link-outs, app-version
+ * row and Sign out. Hosted inside [AccountTab]'s nested nav.
  */
 @Composable
-fun AccountScreen(account: Account?) {
+fun AccountScreen(
+    account: Account?,
+    onBilling: () -> Unit,
+    onSecurity: () -> Unit,
+    onSessions: () -> Unit,
+    onChangePassword: () -> Unit,
+    onNotifications: () -> Unit,
+) {
     val container = LocalAppContainer.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -70,14 +82,42 @@ fun AccountScreen(account: Account?) {
             }
         }
 
-        // Security & notifications (entry points; screens land in Milestone 3)
+        // Billing
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Column {
+                SectionHeader(title = "Billing")
+                ManageRow(
+                    title = "Subscriptions, invoices & credit",
+                    leadingIcon = Icons.Outlined.CreditCard,
+                    modifier = Modifier.clickable(onClick = onBilling),
+                )
+            }
+        }
+
+        // Security & notifications
         GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column {
                 SectionHeader(title = "Security")
-                ManageRow(title = "Two-factor authentication", subtitle = "Coming in Milestone 3")
-                ManageRow(title = "API keys", subtitle = "Coming in Milestone 3")
-                ManageRow(title = "Active sessions", subtitle = "Coming in Milestone 3")
-                ManageRow(title = "Notifications", subtitle = "Coming in Milestone 3")
+                ManageRow(
+                    title = "Two-factor & API keys",
+                    leadingIcon = Icons.Outlined.Shield,
+                    modifier = Modifier.clickable(onClick = onSecurity),
+                )
+                ManageRow(
+                    title = "Active sessions",
+                    leadingIcon = Icons.Outlined.Devices,
+                    modifier = Modifier.clickable(onClick = onSessions),
+                )
+                ManageRow(
+                    title = "Change password",
+                    leadingIcon = Icons.Outlined.Lock,
+                    modifier = Modifier.clickable(onClick = onChangePassword),
+                )
+                ManageRow(
+                    title = "Notifications",
+                    leadingIcon = Icons.Outlined.Notifications,
+                    modifier = Modifier.clickable(onClick = onNotifications),
+                )
             }
         }
 

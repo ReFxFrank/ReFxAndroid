@@ -4,16 +4,23 @@ import android.content.Context
 import gg.refx.android.BuildConfig
 import gg.refx.android.core.network.ApiClientFactory
 import gg.refx.android.core.network.ApiConfig
+import gg.refx.android.app.push.PushTokenRegistrar
 import gg.refx.android.core.network.TokenRefresher
+import gg.refx.android.core.push.PushRouter
 import gg.refx.android.core.realtime.ConsoleSocket
 import gg.refx.android.core.session.SessionManager
 import gg.refx.android.core.storage.AppPreferences
 import gg.refx.android.core.storage.SecureTokenStore
 import gg.refx.android.data.api.AccountApi
 import gg.refx.android.data.api.AuthApi
+import gg.refx.android.data.api.BillingApi
 import gg.refx.android.data.api.ServersApi
+import gg.refx.android.data.api.SupportApi
+import gg.refx.android.data.repo.AccountRepository
 import gg.refx.android.data.repo.AuthRepository
+import gg.refx.android.data.repo.BillingRepository
 import gg.refx.android.data.repo.ServersRepository
+import gg.refx.android.data.repo.SupportRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import retrofit2.Retrofit
@@ -31,6 +38,7 @@ class AppContainer(
     val tokenStore = SecureTokenStore(context)
     val preferences = AppPreferences(context)
     val session = SessionManager(tokenStore)
+    val pushRouter = PushRouter()
 
     val purchasingEnabled: Boolean get() = BuildConfig.PURCHASING_ENABLED
 
@@ -50,6 +58,12 @@ class AppContainer(
     @Volatile
     private var retrofit: Retrofit = ApiClientFactory.retrofit(config.restBaseUrl, okHttpClient)
 
+    val pushRegistrar = PushTokenRegistrar(
+        accountRepoProvider = { accountRepository },
+        session = session,
+        scope = appScope,
+    )
+
     init {
         // Seed from persisted origins and rebuild Retrofit whenever they change.
         appScope.launch {
@@ -60,6 +74,8 @@ class AppContainer(
                 }
             }
         }
+        // Register/unregister the FCM token on the signed-in/out transitions (§7).
+        pushRegistrar.start()
     }
 
     private inline fun <reified T> service(): T = retrofit.create(T::class.java)
@@ -67,6 +83,8 @@ class AppContainer(
     fun authApi(): AuthApi = service()
     fun accountApi(): AccountApi = service()
     fun serversApi(): ServersApi = service()
+    fun billingApi(): BillingApi = service()
+    fun supportApi(): SupportApi = service()
 
     val authRepository: AuthRepository by lazy {
         AuthRepository(
@@ -78,6 +96,18 @@ class AppContainer(
 
     val serversRepository: ServersRepository by lazy {
         ServersRepository(apiProvider = ::serversApi)
+    }
+
+    val accountRepository: AccountRepository by lazy {
+        AccountRepository(apiProvider = ::accountApi)
+    }
+
+    val billingRepository: BillingRepository by lazy {
+        BillingRepository(apiProvider = ::billingApi)
+    }
+
+    val supportRepository: SupportRepository by lazy {
+        SupportRepository(apiProvider = ::supportApi)
     }
 
     /** A fresh console socket per server-detail screen; the owner disposes it. */

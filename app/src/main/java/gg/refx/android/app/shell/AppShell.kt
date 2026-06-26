@@ -8,22 +8,26 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import gg.refx.android.app.LocalAppContainer
 import gg.refx.android.app.nav.TabDestination
 import gg.refx.android.core.design.DesignTokens
+import gg.refx.android.core.push.PushTab
 import gg.refx.android.data.model.Account
 import gg.refx.android.data.model.UserRole
-import gg.refx.android.feature.account.AccountScreen
+import gg.refx.android.feature.account.AccountTab
 import gg.refx.android.feature.home.HomeScreen
 import gg.refx.android.feature.servers.ServersTab
 import gg.refx.android.feature.staff.StaffScreen
-import gg.refx.android.feature.support.SupportScreen
+import gg.refx.android.feature.support.SupportTab
 
 /**
  * Authenticated shell: role-aware bottom navigation hosting one nested graph per
@@ -31,9 +35,28 @@ import gg.refx.android.feature.support.SupportScreen
  */
 @Composable
 fun AppShell(account: Account?) {
+    val container = LocalAppContainer.current
     val role = account?.globalRole ?: UserRole.CUSTOMER
     val tabs = TabDestination.visibleFor(role)
     val navController = rememberNavController()
+
+    // A push deep-link selects the target tab; the nested tab then opens the entity
+    // and clears the pending route (§7). Survives cold launch via PushRouter.
+    val pending by container.pushRouter.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(pending) {
+        val route = pending ?: return@LaunchedEffect
+        val targetTab = when (route.tab) {
+            PushTab.SERVERS -> TabDestination.Servers
+            PushTab.BILLING -> TabDestination.Account
+            PushTab.SUPPORT -> TabDestination.Support
+        }
+        if (targetTab !in tabs) return@LaunchedEffect
+        navController.navigate(targetTab.route) {
+            popUpTo(navController.graph.startDestinationId) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -72,11 +95,11 @@ fun AppShell(account: Account?) {
         ) {
             composable(TabDestination.Home.route) { HomeScreen(account) }
             composable(TabDestination.Servers.route) { ServersTab() }
-            composable(TabDestination.Support.route) { SupportScreen() }
+            composable(TabDestination.Support.route) { SupportTab() }
             if (role.isStaff) {
                 composable(TabDestination.Staff.route) { StaffScreen() }
             }
-            composable(TabDestination.Account.route) { AccountScreen(account) }
+            composable(TabDestination.Account.route) { AccountTab(account) }
         }
     }
 }
