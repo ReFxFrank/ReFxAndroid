@@ -5,6 +5,9 @@
 .DS_Store
 build/
 /captures
+
+# Local scratch artifacts (not part of the project)
+scratchpad-*
 .externalNativeBuild
 .cxx
 local.properties
