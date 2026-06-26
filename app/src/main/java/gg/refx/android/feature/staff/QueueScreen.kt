@@ -35,6 +35,8 @@ import gg.refx.android.core.ui.DetailTopBar
 import gg.refx.android.core.ui.LoadState
 import gg.refx.android.data.model.Ticket
 import gg.refx.android.data.repo.SupportRepository
+import gg.refx.android.feature.support.ticketStateColor
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -54,15 +56,23 @@ class QueueViewModel(private val repo: SupportRepository) : ViewModel() {
     val state: StateFlow<QueueUiState> = _state.asStateFlow()
     private var page = 1
     private val accumulated = mutableListOf<Ticket>()
+    private var loadMoreJob: Job? = null
+    private var epoch = 0
 
     init { load() }
 
     fun load() {
+        val gen = ++epoch
+        loadMoreJob?.cancel()
         page = 1
         if (_state.value.tickets.value == null) _state.update { it.copy(tickets = LoadState.Loading) }
         viewModelScope.launch {
             runCatching { repo.tickets(1, mine = false) }
-                .onSuccess { r -> page = 1; accumulated.clear(); addDistinct(r.items); _state.update { it.copy(tickets = LoadState.Loaded(accumulated.toList()), hasMore = r.hasMore) } }
+                .onSuccess { r ->
+                    if (gen != epoch) return@onSuccess
+                    page = 1; accumulated.clear(); addDistinct(r.items)
+                    _state.update { it.copy(tickets = LoadState.Loaded(accumulated.toList()), hasMore = r.hasMore, isLoadingMore = false) }
+                }
                 .onFailure { t -> _state.update { if (it.tickets.value == null) it.copy(tickets = LoadState.Failed(t.toApiException().message)) else it } }
         }
     }
@@ -70,10 +80,15 @@ class QueueViewModel(private val repo: SupportRepository) : ViewModel() {
     fun loadNextPage() {
         val s = _state.value
         if (!s.hasMore || s.isLoadingMore) return
+        val gen = epoch
         _state.update { it.copy(isLoadingMore = true) }
-        viewModelScope.launch {
+        loadMoreJob = viewModelScope.launch {
             runCatching { repo.tickets(page + 1, mine = false) }
-                .onSuccess { r -> page += 1; addDistinct(r.items); _state.update { it.copy(tickets = LoadState.Loaded(accumulated.toList()), hasMore = r.hasMore, isLoadingMore = false) } }
+                .onSuccess { r ->
+                    if (gen != epoch) { _state.update { it.copy(isLoadingMore = false) }; return@onSuccess }
+                    page += 1; addDistinct(r.items)
+                    _state.update { it.copy(tickets = LoadState.Loaded(accumulated.toList()), hasMore = r.hasMore, isLoadingMore = false) }
+                }
                 .onFailure { _state.update { it.copy(isLoadingMore = false) } }
         }
     }
@@ -108,7 +123,8 @@ fun QueueScreen(onBack: () -> Unit, onOpenTicket: (String) -> Unit) {
                                 Text(ticket.subject, color = DesignTokens.AppForegroundStrong, style = MaterialTheme.typography.titleMedium)
                                 Text("#${ticket.number}", color = DesignTokens.AppMuted, style = MaterialTheme.typography.bodySmall)
                             }
-                            StatusChip(ticket.state.name.replace('_', ' '), DesignTokens.AppAccentText)
+                            val (label, color) = ticketStateColor(ticket.state)
+                            StatusChip(label, color)
                         }
                     }
                 }

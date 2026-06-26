@@ -125,7 +125,7 @@ private fun TicketRow(ticket: Ticket, onClick: () -> Unit) {
     }
 }
 
-private fun ticketStateColor(state: TicketState) = when (state) {
+internal fun ticketStateColor(state: TicketState) = when (state) {
     TicketState.OPEN, TicketState.PENDING_AGENT -> "Open" to DesignTokens.AppPrimary
     TicketState.PENDING_CUSTOMER -> "Awaiting you" to DesignTokens.AppWarning
     TicketState.RESOLVED -> "Resolved" to DesignTokens.AppSuccess

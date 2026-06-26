@@ -41,12 +41,12 @@ import gg.refx.android.data.model.AdminUserDetail
 import gg.refx.android.data.model.CreditReason
 import gg.refx.android.data.model.UserRole
 import gg.refx.android.data.repo.StaffRepository
+import gg.refx.android.feature.servers.sections.ConfirmDialog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.math.roundToLong
 
 data class AdminUserDetailUiState(
     val user: LoadState<AdminUserDetail> = LoadState.Loading,
@@ -94,6 +94,7 @@ fun AdminUserDetailScreen(userId: String, onBack: () -> Unit) {
     )
     val state by vm.state.collectAsStateWithLifecycle()
     var showCredit by remember { mutableStateOf(false) }
+    var pendingConfirm by remember { mutableStateOf<Triple<String, String, () -> Unit>?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         DetailTopBar(title = state.user.value?.displayName ?: "User", onBack = onBack)
@@ -121,7 +122,17 @@ fun AdminUserDetailScreen(userId: String, onBack: () -> Unit) {
                         SectionHeader(title = "Account state")
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf("ACTIVE", "SUSPENDED", "BANNED").forEach { s ->
-                                RefxSecondaryButton(text = s.lowercase().replaceFirstChar { it.uppercase() }, onClick = { vm.setState(s) }, enabled = !state.busy && user.state?.uppercase() != s)
+                                RefxSecondaryButton(
+                                    text = s.lowercase().replaceFirstChar { it.uppercase() },
+                                    onClick = {
+                                        if (s == "BANNED") {
+                                            pendingConfirm = Triple("Ban ${user.displayName}?", "They will immediately lose access to ReFx.") { vm.setState(s) }
+                                        } else {
+                                            vm.setState(s)
+                                        }
+                                    },
+                                    enabled = !state.busy && user.state?.uppercase() != s,
+                                )
                             }
                         }
                         if (!user.emailVerified) {
@@ -136,7 +147,16 @@ fun AdminUserDetailScreen(userId: String, onBack: () -> Unit) {
                         SectionHeader(title = "Role")
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(UserRole.CUSTOMER, UserRole.SUPPORT, UserRole.ADMIN, UserRole.OWNER).forEach { r ->
-                                TextButton(onClick = { vm.setRole(r.raw) }, enabled = !state.busy && user.globalRole != r) {
+                                TextButton(
+                                    onClick = {
+                                        if (r == UserRole.ADMIN || r == UserRole.OWNER) {
+                                            pendingConfirm = Triple("Grant ${r.name}?", "This gives elevated platform access.") { vm.setRole(r.raw) }
+                                        } else {
+                                            vm.setRole(r.raw)
+                                        }
+                                    },
+                                    enabled = !state.busy && user.globalRole != r,
+                                ) {
                                     Text(r.name.lowercase().replaceFirstChar { it.uppercase() }, color = if (user.globalRole == r) DesignTokens.AppPrimary else DesignTokens.AppMuted)
                                 }
                             }
@@ -161,6 +181,10 @@ fun AdminUserDetailScreen(userId: String, onBack: () -> Unit) {
             onSubmit = { minor, reason, note -> vm.grantCredit(minor, reason, note); showCredit = false },
         )
     }
+
+    pendingConfirm?.let { (title, message, action) ->
+        ConfirmDialog(title, message, "Confirm", { action(); pendingConfirm = null }, { pendingConfirm = null })
+    }
 }
 
 @Composable
@@ -168,7 +192,17 @@ private fun AdjustCreditDialog(onDismiss: () -> Unit, onSubmit: (Long, CreditRea
     var amount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var reason by remember { mutableStateOf(CreditReason.ADMIN_GRANT) }
-    val amountMinor = remember(amount) { (amount.toDoubleOrNull()?.times(100))?.roundToLong() }
+    // Store credit is platform-currency (USD); scale by that currency's minor-unit
+    // digits via BigDecimal (never floats for money, §3.2). Reconcile if multi-currency.
+    val amountMinor = remember(amount) {
+        runCatching {
+            val digits = java.util.Currency.getInstance("USD").defaultFractionDigits
+            java.math.BigDecimal(amount.trim())
+                .movePointRight(digits)
+                .setScale(0, java.math.RoundingMode.HALF_UP)
+                .toLong()
+        }.getOrNull()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,

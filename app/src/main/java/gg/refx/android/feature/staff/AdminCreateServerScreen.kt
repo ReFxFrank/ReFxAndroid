@@ -13,11 +13,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -35,7 +40,9 @@ import gg.refx.android.data.model.AdminGameTemplate
 import gg.refx.android.data.model.AdminUser
 import gg.refx.android.data.model.NodeAdmin
 import gg.refx.android.data.repo.StaffRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -70,6 +77,8 @@ class CreateServerViewModel(private val repo: StaffRepository) : ViewModel() {
     private val _state = MutableStateFlow(CreateServerUiState())
     val state: StateFlow<CreateServerUiState> = _state.asStateFlow()
 
+    private var ownerSearchJob: Job? = null
+
     init { load() }
 
     fun load() {
@@ -85,9 +94,12 @@ class CreateServerViewModel(private val repo: StaffRepository) : ViewModel() {
     fun onName(v: String) = _state.update { it.copy(name = v) }
     fun onOwnerQuery(v: String) {
         _state.update { it.copy(ownerQuery = v) }
-        viewModelScope.launch {
+        ownerSearchJob?.cancel()
+        ownerSearchJob = viewModelScope.launch {
+            delay(300)
             val owners = runCatching { repo.users(1, query = v).items }.getOrDefault(emptyList())
-            _state.update { it.copy(owners = owners) }
+            // Drop stale results for a query the user has since changed.
+            if (_state.value.ownerQuery == v) _state.update { it.copy(owners = owners) }
         }
     }
     fun selectTemplate(id: String) = _state.update { it.copy(selectedTemplateId = id) }
@@ -132,10 +144,17 @@ fun AdminCreateServerScreen(onBack: () -> Unit) {
         factory = viewModelFactory { initializer { CreateServerViewModel(container.staffRepository) } },
     )
     val state by vm.state.collectAsStateWithLifecycle()
+    val snackbarHost = remember { SnackbarHostState() }
 
-    LaunchedEffect(state.createdOnNode) { if (state.createdOnNode != null) onBack() }
+    LaunchedEffect(state.createdOnNode) {
+        state.createdOnNode?.let { node ->
+            snackbarHost.showSnackbar("Server created — provisioning on $node.")
+            onBack()
+        }
+    }
 
-    Column(Modifier.fillMaxSize()) {
+    Scaffold(containerColor = Color.Transparent, snackbarHost = { SnackbarHost(snackbarHost) }) { padding ->
+      Column(Modifier.fillMaxSize().padding(padding)) {
         DetailTopBar(title = "Create server", onBack = onBack)
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             state.error?.let { Text(it, color = DesignTokens.AppDestructive, style = MaterialTheme.typography.bodySmall) }
@@ -173,6 +192,7 @@ fun AdminCreateServerScreen(onBack: () -> Unit) {
 
             RefxPrimaryButton("Create server", vm::submit, enabled = state.canSubmit, loading = state.submitting, fullWidth = true, modifier = Modifier.fillMaxWidth())
         }
+      }
     }
 }
 

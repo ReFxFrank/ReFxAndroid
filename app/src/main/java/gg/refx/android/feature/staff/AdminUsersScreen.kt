@@ -64,6 +64,8 @@ class AdminUsersViewModel(private val repo: StaffRepository) : ViewModel() {
     private var page = 1
     private val accumulated = mutableListOf<AdminUser>()
     private var searchJob: Job? = null
+    private var loadMoreJob: Job? = null
+    private var epoch = 0
 
     init { load() }
 
@@ -74,13 +76,16 @@ class AdminUsersViewModel(private val repo: StaffRepository) : ViewModel() {
     }
 
     fun load() {
+        val gen = ++epoch
+        loadMoreJob?.cancel()
         page = 1
         if (_state.value.users.value == null) _state.update { it.copy(users = LoadState.Loading) }
         viewModelScope.launch {
             runCatching { repo.users(1, query = _state.value.query) }
                 .onSuccess { r ->
+                    if (gen != epoch) return@onSuccess
                     page = 1; accumulated.clear(); addDistinct(r.items)
-                    _state.update { it.copy(users = LoadState.Loaded(accumulated.toList()), hasMore = r.hasMore) }
+                    _state.update { it.copy(users = LoadState.Loaded(accumulated.toList()), hasMore = r.hasMore, isLoadingMore = false) }
                 }
                 .onFailure { t -> _state.update { if (it.users.value == null) it.copy(users = LoadState.Failed(t.toApiException().message)) else it } }
         }
@@ -89,10 +94,12 @@ class AdminUsersViewModel(private val repo: StaffRepository) : ViewModel() {
     fun loadNextPage() {
         val s = _state.value
         if (!s.hasMore || s.isLoadingMore) return
+        val gen = epoch
         _state.update { it.copy(isLoadingMore = true) }
-        viewModelScope.launch {
+        loadMoreJob = viewModelScope.launch {
             runCatching { repo.users(page + 1, query = s.query) }
                 .onSuccess { r ->
+                    if (gen != epoch) { _state.update { it.copy(isLoadingMore = false) }; return@onSuccess }
                     page += 1; addDistinct(r.items)
                     _state.update { it.copy(users = LoadState.Loaded(accumulated.toList()), hasMore = r.hasMore, isLoadingMore = false) }
                 }
@@ -131,7 +138,13 @@ fun AdminUsersScreen(onBack: () -> Unit, onOpenUser: (String) -> Unit) {
             placeholder = { Text("Search users") },
             leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
         )
-        AsyncState(state = state.users, isEmpty = { it.isEmpty() && state.query.isBlank() }, emptyTitle = "No users", onRetry = vm::load) { users ->
+        AsyncState(
+            state = state.users,
+            isEmpty = { it.isEmpty() },
+            emptyTitle = if (state.query.isBlank()) "No users" else "No matches for \"${state.query}\"",
+            emptyMessage = if (state.query.isBlank()) null else "Try a different name or email.",
+            onRetry = vm::load,
+        ) { users ->
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(users, key = { it.id }) { user ->
                     GlassCard(modifier = Modifier.fillMaxWidth().clickable { onOpenUser(user.id) }) {

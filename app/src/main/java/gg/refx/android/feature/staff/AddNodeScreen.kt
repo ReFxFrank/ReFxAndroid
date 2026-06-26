@@ -153,10 +153,11 @@ fun AddNodeScreen(onBack: () -> Unit) {
         }
     }
 
-    // One-time bootstrap token reveal — can't be retrieved later (§5).
+    // One-time bootstrap token reveal — can't be retrieved later (§5). Block scrim/
+    // back dismissal so an accidental tap can't navigate away before copying.
     state.bootstrapToken?.let { token ->
         AlertDialog(
-            onDismissRequest = onBack,
+            onDismissRequest = { },
             title = { Text("Node created") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -165,6 +166,7 @@ fun AddNodeScreen(onBack: () -> Unit) {
                 }
             },
             confirmButton = { TextButton(onClick = { clipboard.setText(AnnotatedString(token)); onBack() }) { Text("Copy & close") } },
+            dismissButton = { TextButton(onClick = onBack) { Text("Close") } },
         )
     }
 }

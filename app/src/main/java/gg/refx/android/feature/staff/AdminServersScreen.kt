@@ -72,6 +72,8 @@ class AdminServersViewModel(private val repo: StaffRepository) : ViewModel() {
     private var page = 1
     private val accumulated = mutableListOf<Server>()
     private var searchJob: Job? = null
+    private var loadMoreJob: Job? = null
+    private var epoch = 0
 
     init { load() }
 
@@ -82,11 +84,17 @@ class AdminServersViewModel(private val repo: StaffRepository) : ViewModel() {
     }
 
     fun load() {
+        val gen = ++epoch
+        loadMoreJob?.cancel()
         page = 1
         if (_state.value.servers.value == null) _state.update { it.copy(servers = LoadState.Loading) }
         viewModelScope.launch {
             runCatching { repo.servers(1, query = _state.value.query) }
-                .onSuccess { r -> page = 1; accumulated.clear(); addDistinct(r.items); _state.update { it.copy(servers = LoadState.Loaded(accumulated.toList()), hasMore = r.hasMore) } }
+                .onSuccess { r ->
+                    if (gen != epoch) return@onSuccess
+                    page = 1; accumulated.clear(); addDistinct(r.items)
+                    _state.update { it.copy(servers = LoadState.Loaded(accumulated.toList()), hasMore = r.hasMore, isLoadingMore = false) }
+                }
                 .onFailure { t -> _state.update { if (it.servers.value == null) it.copy(servers = LoadState.Failed(t.toApiException().message)) else it } }
         }
     }
@@ -94,10 +102,15 @@ class AdminServersViewModel(private val repo: StaffRepository) : ViewModel() {
     fun loadNextPage() {
         val s = _state.value
         if (!s.hasMore || s.isLoadingMore) return
+        val gen = epoch
         _state.update { it.copy(isLoadingMore = true) }
-        viewModelScope.launch {
+        loadMoreJob = viewModelScope.launch {
             runCatching { repo.servers(page + 1, query = s.query) }
-                .onSuccess { r -> page += 1; addDistinct(r.items); _state.update { it.copy(servers = LoadState.Loaded(accumulated.toList()), hasMore = r.hasMore, isLoadingMore = false) } }
+                .onSuccess { r ->
+                    if (gen != epoch) { _state.update { it.copy(isLoadingMore = false) }; return@onSuccess }
+                    page += 1; addDistinct(r.items)
+                    _state.update { it.copy(servers = LoadState.Loaded(accumulated.toList()), hasMore = r.hasMore, isLoadingMore = false) }
+                }
                 .onFailure { _state.update { it.copy(isLoadingMore = false) } }
         }
     }
@@ -144,7 +157,13 @@ fun AdminServersScreen(onBack: () -> Unit, onCreate: () -> Unit) {
             leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
         )
         state.error?.let { Text(it, color = DesignTokens.AppDestructive, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp)) }
-        AsyncState(state = state.servers, isEmpty = { it.isEmpty() && state.query.isBlank() }, emptyTitle = "No servers", onRetry = vm::load) { servers ->
+        AsyncState(
+            state = state.servers,
+            isEmpty = { it.isEmpty() },
+            emptyTitle = if (state.query.isBlank()) "No servers" else "No matches for \"${state.query}\"",
+            emptyMessage = if (state.query.isBlank()) null else "Try a different server or owner name.",
+            onRetry = vm::load,
+        ) { servers ->
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(servers, key = { it.id }) { server ->
                     val (label, color) = StateColors.server(server.state)

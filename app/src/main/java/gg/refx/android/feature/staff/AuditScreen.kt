@@ -32,6 +32,7 @@ import gg.refx.android.core.ui.DetailTopBar
 import gg.refx.android.core.ui.LoadState
 import gg.refx.android.data.model.AuditEntry
 import gg.refx.android.data.repo.StaffRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,15 +51,23 @@ class AuditViewModel(private val repo: StaffRepository) : ViewModel() {
     val state: StateFlow<AuditUiState> = _state.asStateFlow()
     private var page = 1
     private val accumulated = mutableListOf<AuditEntry>()
+    private var loadMoreJob: Job? = null
+    private var epoch = 0
 
     init { load() }
 
     fun load() {
+        val gen = ++epoch
+        loadMoreJob?.cancel()
         page = 1
         if (_state.value.entries.value == null) _state.update { it.copy(entries = LoadState.Loading) }
         viewModelScope.launch {
             runCatching { repo.auditLogs(1) }
-                .onSuccess { r -> page = 1; accumulated.clear(); accumulated += r.items; _state.update { it.copy(entries = LoadState.Loaded(accumulated.toList()), hasMore = r.hasMore) } }
+                .onSuccess { r ->
+                    if (gen != epoch) return@onSuccess
+                    page = 1; accumulated.clear(); accumulated += r.items
+                    _state.update { it.copy(entries = LoadState.Loaded(accumulated.toList()), hasMore = r.hasMore, isLoadingMore = false) }
+                }
                 .onFailure { t -> _state.update { if (it.entries.value == null) it.copy(entries = LoadState.Failed(t.toApiException().message)) else it } }
         }
     }
@@ -66,10 +75,15 @@ class AuditViewModel(private val repo: StaffRepository) : ViewModel() {
     fun loadNextPage() {
         val s = _state.value
         if (!s.hasMore || s.isLoadingMore) return
+        val gen = epoch
         _state.update { it.copy(isLoadingMore = true) }
-        viewModelScope.launch {
+        loadMoreJob = viewModelScope.launch {
             runCatching { repo.auditLogs(page + 1) }
-                .onSuccess { r -> page += 1; accumulated += r.items; _state.update { it.copy(entries = LoadState.Loaded(accumulated.toList()), hasMore = r.hasMore, isLoadingMore = false) } }
+                .onSuccess { r ->
+                    if (gen != epoch) { _state.update { it.copy(isLoadingMore = false) }; return@onSuccess }
+                    page += 1; accumulated += r.items
+                    _state.update { it.copy(entries = LoadState.Loaded(accumulated.toList()), hasMore = r.hasMore, isLoadingMore = false) }
+                }
                 .onFailure { _state.update { it.copy(isLoadingMore = false) } }
         }
     }
