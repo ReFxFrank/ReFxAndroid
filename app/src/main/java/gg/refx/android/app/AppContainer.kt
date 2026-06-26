@@ -17,7 +17,10 @@ import gg.refx.android.data.api.BackupsApi
 import gg.refx.android.data.api.BillingApi
 import gg.refx.android.data.api.DatabasesApi
 import gg.refx.android.data.api.FilesApi
+import gg.refx.android.data.api.SchedulesApi
+import gg.refx.android.data.api.ServerSettingsApi
 import gg.refx.android.data.api.ServersApi
+import gg.refx.android.data.api.SubUsersApi
 import gg.refx.android.data.api.SupportApi
 import gg.refx.android.data.repo.AccountRepository
 import gg.refx.android.data.repo.AuthRepository
@@ -25,7 +28,10 @@ import gg.refx.android.data.repo.BackupsRepository
 import gg.refx.android.data.repo.BillingRepository
 import gg.refx.android.data.repo.DatabasesRepository
 import gg.refx.android.data.repo.FilesRepository
+import gg.refx.android.data.repo.SchedulesRepository
+import gg.refx.android.data.repo.ServerSettingsRepository
 import gg.refx.android.data.repo.ServersRepository
+import gg.refx.android.data.repo.SubUsersRepository
 import gg.refx.android.data.repo.SupportRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -94,6 +100,9 @@ class AppContainer(
     fun filesApi(): FilesApi = service()
     fun backupsApi(): BackupsApi = service()
     fun databasesApi(): DatabasesApi = service()
+    fun subUsersApi(): SubUsersApi = service()
+    fun schedulesApi(): SchedulesApi = service()
+    fun serverSettingsApi(): ServerSettingsApi = service()
 
     val authRepository: AuthRepository by lazy {
         AuthRepository(
@@ -122,6 +131,9 @@ class AppContainer(
     val filesRepository: FilesRepository by lazy { FilesRepository(apiProvider = ::filesApi) }
     val backupsRepository: BackupsRepository by lazy { BackupsRepository(apiProvider = ::backupsApi) }
     val databasesRepository: DatabasesRepository by lazy { DatabasesRepository(apiProvider = ::databasesApi) }
+    val subUsersRepository: SubUsersRepository by lazy { SubUsersRepository(apiProvider = ::subUsersApi) }
+    val schedulesRepository: SchedulesRepository by lazy { SchedulesRepository(apiProvider = ::schedulesApi) }
+    val serverSettingsRepository: ServerSettingsRepository by lazy { ServerSettingsRepository(apiProvider = ::serverSettingsApi) }
 
     /** A fresh console socket per server-detail screen; the owner disposes it. */
     fun createConsoleSocket(): ConsoleSocket =

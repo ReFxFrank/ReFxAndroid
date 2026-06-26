@@ -5,6 +5,7 @@ import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Schedule
@@ -39,11 +40,12 @@ enum class ServerSection(
     VOICE("Voice", Icons.Outlined.Mic, "voice"),
     SWITCH_GAME("Switch game", Icons.Outlined.SwapHoriz, "switch-game"),
     UPGRADE("Upgrade", Icons.Outlined.Upgrade, "upgrade"),
+    SUB_USERS("Sub-users", Icons.Outlined.Group, "sub-users"),
     SETTINGS("Settings", Icons.Outlined.Settings, "settings");
 
     /** Sections with a native screen; the rest deep-link to the web panel. */
     val isNative: Boolean
-        get() = this in setOf(CONSOLE, FILES, BACKUPS, DATABASES)
+        get() = this in setOf(CONSOLE, FILES, BACKUPS, DATABASES, SCHEDULES, SUB_USERS, SETTINGS)
 
     fun isApplicable(server: Server): Boolean {
         val slug = server.template?.slug?.lowercase().orEmpty()
@@ -54,6 +56,8 @@ enum class ServerSection(
             WORKSHOP -> server.template?.supportsWorkshop == true
             VOICE -> isVoice
             CONSOLE, SWITCH_GAME -> !isVoice
+            // Sub-users is an Android-side management section (no iOS ServerSection
+            // equivalent); always available.
             else -> true
         }
     }

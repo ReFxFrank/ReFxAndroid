@@ -14,6 +14,9 @@ import gg.refx.android.core.ui.WebLink
 import gg.refx.android.feature.servers.sections.BackupsScreen
 import gg.refx.android.feature.servers.sections.DatabasesScreen
 import gg.refx.android.feature.servers.sections.FilesScreen
+import gg.refx.android.feature.servers.sections.SchedulesScreen
+import gg.refx.android.feature.servers.sections.ServerSettingsScreen
+import gg.refx.android.feature.servers.sections.SubUsersScreen
 
 /**
  * Nested navigation for the Servers tab: list → detail. Keeping the graph inside
@@ -49,19 +52,31 @@ fun ServersTab() {
                         ServerSection.FILES -> nav.navigate("files/$id")
                         ServerSection.BACKUPS -> nav.navigate("backups/$id")
                         ServerSection.DATABASES -> nav.navigate("databases/$id")
+                        ServerSection.SCHEDULES -> nav.navigate("schedules/$id")
+                        ServerSection.SUB_USERS -> nav.navigate("subusers/$id")
+                        ServerSection.SETTINGS -> nav.navigate("settings/$id")
                         else -> WebLink.open(context, "${container.config.webOrigin}/servers/$shortId/${section.webPath}")
                     }
                 },
             )
         }
-        composable("files/{serverId}") { entry ->
-            FilesScreen(serverId = entry.arguments?.getString("serverId").orEmpty(), onBack = { nav.popBackStack() })
+        composable("files/{serverId}") { e ->
+            FilesScreen(serverId = e.arguments?.getString("serverId").orEmpty(), onBack = { nav.popBackStack() })
         }
-        composable("backups/{serverId}") { entry ->
-            BackupsScreen(serverId = entry.arguments?.getString("serverId").orEmpty(), onBack = { nav.popBackStack() })
+        composable("backups/{serverId}") { e ->
+            BackupsScreen(serverId = e.arguments?.getString("serverId").orEmpty(), onBack = { nav.popBackStack() })
         }
-        composable("databases/{serverId}") { entry ->
-            DatabasesScreen(serverId = entry.arguments?.getString("serverId").orEmpty(), onBack = { nav.popBackStack() })
+        composable("databases/{serverId}") { e ->
+            DatabasesScreen(serverId = e.arguments?.getString("serverId").orEmpty(), onBack = { nav.popBackStack() })
+        }
+        composable("schedules/{serverId}") { e ->
+            SchedulesScreen(serverId = e.arguments?.getString("serverId").orEmpty(), onBack = { nav.popBackStack() })
+        }
+        composable("subusers/{serverId}") { e ->
+            SubUsersScreen(serverId = e.arguments?.getString("serverId").orEmpty(), onBack = { nav.popBackStack() })
+        }
+        composable("settings/{serverId}") { e ->
+            ServerSettingsScreen(serverId = e.arguments?.getString("serverId").orEmpty(), onBack = { nav.popBackStack() })
         }
     }
 }
