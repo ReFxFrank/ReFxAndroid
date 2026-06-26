@@ -41,6 +41,10 @@ enum class ServerSection(
     UPGRADE("Upgrade", Icons.Outlined.Upgrade, "upgrade"),
     SETTINGS("Settings", Icons.Outlined.Settings, "settings");
 
+    /** Sections with a native screen; the rest deep-link to the web panel. */
+    val isNative: Boolean
+        get() = this in setOf(CONSOLE, FILES, BACKUPS, DATABASES)
+
     fun isApplicable(server: Server): Boolean {
         val slug = server.template?.slug?.lowercase().orEmpty()
         val isVoice = slug.contains("teamspeak")

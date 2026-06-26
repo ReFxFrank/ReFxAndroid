@@ -65,7 +65,11 @@ import gg.refx.android.data.model.ServerState
 import gg.refx.android.data.model.StateColors
 
 @Composable
-fun ServerDetailScreen(serverId: String, onBack: () -> Unit) {
+fun ServerDetailScreen(
+    serverId: String,
+    onBack: () -> Unit,
+    onOpenSection: (ServerSection, String) -> Unit,
+) {
     val container = LocalAppContainer.current
     val vm: ServerDetailViewModel = viewModel(
         factory = viewModelFactory {
@@ -117,7 +121,7 @@ fun ServerDetailScreen(serverId: String, onBack: () -> Unit) {
                     scrollKey = appendCount,
                     onSend = vm::sendCommand,
                 )
-                SectionsCard(server = server)
+                SectionsCard(server = server, onOpen = onOpenSection)
             }
         }
     }
@@ -364,9 +368,7 @@ private fun ConnectionDot(connection: ConsoleConnectionState) {
 }
 
 @Composable
-private fun SectionsCard(server: Server) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val webOrigin = LocalAppContainer.current.config.webOrigin
+private fun SectionsCard(server: Server, onOpen: (ServerSection, String) -> Unit) {
     val sections = remember(server.id) { ServerSection.applicableFor(server).filter { it != ServerSection.CONSOLE } }
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column {
@@ -375,14 +377,8 @@ private fun SectionsCard(server: Server) {
                 ManageRow(
                     title = section.label,
                     leadingIcon = section.icon,
-                    subtitle = "Opens in Milestone 4",
-                    modifier = Modifier.clickable {
-                        // Until native screens land, deep-link to the web panel section.
-                        gg.refx.android.core.ui.WebLink.open(
-                            context,
-                            "$webOrigin/servers/${server.shortId}/${section.webPath}",
-                        )
-                    },
+                    subtitle = if (section.isNative) null else "Opens on the web",
+                    modifier = Modifier.clickable { onOpen(section, server.shortId) },
                 )
             }
         }

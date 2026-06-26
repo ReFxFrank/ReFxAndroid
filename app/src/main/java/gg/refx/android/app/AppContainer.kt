@@ -13,12 +13,18 @@ import gg.refx.android.core.storage.AppPreferences
 import gg.refx.android.core.storage.SecureTokenStore
 import gg.refx.android.data.api.AccountApi
 import gg.refx.android.data.api.AuthApi
+import gg.refx.android.data.api.BackupsApi
 import gg.refx.android.data.api.BillingApi
+import gg.refx.android.data.api.DatabasesApi
+import gg.refx.android.data.api.FilesApi
 import gg.refx.android.data.api.ServersApi
 import gg.refx.android.data.api.SupportApi
 import gg.refx.android.data.repo.AccountRepository
 import gg.refx.android.data.repo.AuthRepository
+import gg.refx.android.data.repo.BackupsRepository
 import gg.refx.android.data.repo.BillingRepository
+import gg.refx.android.data.repo.DatabasesRepository
+import gg.refx.android.data.repo.FilesRepository
 import gg.refx.android.data.repo.ServersRepository
 import gg.refx.android.data.repo.SupportRepository
 import kotlinx.coroutines.CoroutineScope
@@ -85,6 +91,9 @@ class AppContainer(
     fun serversApi(): ServersApi = service()
     fun billingApi(): BillingApi = service()
     fun supportApi(): SupportApi = service()
+    fun filesApi(): FilesApi = service()
+    fun backupsApi(): BackupsApi = service()
+    fun databasesApi(): DatabasesApi = service()
 
     val authRepository: AuthRepository by lazy {
         AuthRepository(
@@ -109,6 +118,10 @@ class AppContainer(
     val supportRepository: SupportRepository by lazy {
         SupportRepository(apiProvider = ::supportApi)
     }
+
+    val filesRepository: FilesRepository by lazy { FilesRepository(apiProvider = ::filesApi) }
+    val backupsRepository: BackupsRepository by lazy { BackupsRepository(apiProvider = ::backupsApi) }
+    val databasesRepository: DatabasesRepository by lazy { DatabasesRepository(apiProvider = ::databasesApi) }
 
     /** A fresh console socket per server-detail screen; the owner disposes it. */
     fun createConsoleSocket(): ConsoleSocket =
