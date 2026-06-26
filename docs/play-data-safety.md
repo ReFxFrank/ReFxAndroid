@@ -6,7 +6,8 @@ Re-verify against the backend privacy policy before each submission.
 
 > **Scope note.** This describes the **ReFx Android client only**. The backend
 > (api.refx.gg) and the web checkout (refx.gg) have their own data handling;
-> link the published privacy policy in the Play Console.
+> link the published privacy policy (https://refx.gg/privacy) in the Play Console.
+> Support: https://refx.gg/support · Terms: https://refx.gg/terms.
 
 ## Summary of what the app handles
 
@@ -69,7 +70,8 @@ Re-verify against the backend privacy policy before each submission.
 - ☑ **Data is encrypted in transit** — all API traffic is HTTPS/TLS; cleartext
   traffic is disabled (no `usesCleartextTraffic`).
 - ☑ **Users can request that data be deleted** — account deletion is available
-  via the account/web flow; document the deletion path in the privacy policy.
+  via the account/web flow; the deletion path is documented at
+  https://refx.gg/privacy.
 - ☑ **Tokens encrypted at rest** — session tokens are stored with
   `EncryptedSharedPreferences` (Android Keystore-backed). *(Play's "encrypted in
   transit" toggle covers network; on-device encryption is described here for

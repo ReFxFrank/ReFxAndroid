@@ -45,7 +45,10 @@ purchasingEnabled)` drops them when purchasing is off. Covered by
 - Auth tokens live only in `EncryptedSharedPreferences` (Android Keystore).
 - All network traffic is HTTPS; cleartext is not permitted.
 - External links (web checkout, panels, legal pages) open via Custom Tabs and
-  are **https-only** (`core/ui/WebLink` rejects other schemes).
+  are **https-only** (`core/ui/WebLink` rejects other schemes). The in-app
+  Privacy Policy / Terms link-outs (AccountScreen) resolve to
+  https://refx.gg/privacy and https://refx.gg/terms via `ApiConfig.webUrl(...)`;
+  support is https://refx.gg/support.
 
 ## Permissions hygiene
 Declare only permissions the app exercises. Current set: `INTERNET`,

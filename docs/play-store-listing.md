@@ -53,8 +53,10 @@ website.
 ## Listing metadata
 - **Category:** Tools (alt: Productivity)
 - **Tags:** game server, hosting, control panel, server management
-- **Contact email:** *(support address — fill in before submission)*
-- **Privacy policy URL:** *(public privacy policy — required; fill in)*
+- **Support URL:** https://refx.gg/support
+- **Contact email:** support@refx.gg *(confirm the monitored address)*
+- **Privacy policy URL:** https://refx.gg/privacy
+- **Terms of Service URL:** https://refx.gg/terms
 - **Content rating:** complete the IARC questionnaire; expected **Everyone**
   (utility app, no user-generated public content, no ads).
 
@@ -76,7 +78,7 @@ brand kit before submission:
 > visible if desired, or a release build for a compliance-accurate set.
 
 ## Pre-launch checklist
-- [ ] Privacy policy URL live and linked
+- [ ] Privacy policy URL live and linked (https://refx.gg/privacy)
 - [ ] Data safety form filled per `play-data-safety.md`
 - [ ] Content rating questionnaire complete
 - [ ] Signed AAB uploaded (release signing via CI secrets)
